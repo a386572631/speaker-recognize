@@ -1,0 +1,26 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+frontend/dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+backend/.venv
+
+
+.omc
+nul
+.env
+*.log
+node_modules
+dist
+large_tool_results/
+
+.idea/
+.env
+backend/models/**
+speaker-verify.md
+**/.ruff_cache
+.DS_Store

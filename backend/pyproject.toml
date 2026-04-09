@@ -1,0 +1,23 @@
+[project]
+name = "speaker-recognition-backend"
+version = "0.1.0"
+description = "Speaker Recognition API with FastAPI"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "python-dotenv>=1.0.1",
+    "pydantic-settings>=2.6.0",
+    "torch==2.8.0",
+    "torchaudio==2.8.0",
+    "pydub>=0.25.1",
+    "python-multipart>=0.0.20",
+    "qwen-asr",
+    "pyannote.audio>=3.0.0",
+    "numpy",
+    "torchcodec==0.7.0",
+    "funasr"
+]
+
+[dependency-groups]
+dev = []
