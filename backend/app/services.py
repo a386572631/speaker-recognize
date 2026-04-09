@@ -17,6 +17,19 @@ from .utils import (
 )
 
 
+def _run_speaker_diarization(audio_path: str, pipeline) -> List[dict]:
+    from pyannote.audio.pipelines.utils.hook import ProgressHook
+
+    with ProgressHook() as hook:
+        output = pipeline(audio_path, hook=hook)
+
+    speaker_str = ""
+    for turn, speaker in output.speaker_diarization:
+        speaker_str += f"start={turn.start:.1f}s stop={turn.end:.1f}s speaker_{speaker}"
+
+    return parse_speaker_segments(speaker_str)
+
+
 def transcribe_audio(audio_path: str) -> List[dict]:
     asr = get_asr_model()
     pipeline = asr.pipeline
@@ -27,18 +40,7 @@ def transcribe_audio(audio_path: str) -> List[dict]:
         results = funasr_model.generate(input=[audio_path], batch_size_s=300)
         text = results[0].get("text", "")
 
-        from pyannote.audio.pipelines.utils.hook import ProgressHook
-
-        with ProgressHook() as hook:
-            output = pipeline(audio_path, hook=hook)
-
-        speaker_str = ""
-        for turn, speaker in output.speaker_diarization:
-            speaker_str += (
-                f"start={turn.start:.1f}s stop={turn.end:.1f}s speaker_{speaker}"
-            )
-
-        speaker_segments = parse_speaker_segments(speaker_str)
+        speaker_segments = _run_speaker_diarization(audio_path, pipeline)
 
         return [
             {
@@ -56,18 +58,7 @@ def transcribe_audio(audio_path: str) -> List[dict]:
             audio=audio_path, language="Chinese", return_time_stamps=True
         )
 
-        from pyannote.audio.pipelines.utils.hook import ProgressHook
-
-        with ProgressHook() as hook:
-            output = pipeline(audio_path, hook=hook)
-
-        speaker_str = ""
-        for turn, speaker in output.speaker_diarization:
-            speaker_str += (
-                f"start={turn.start:.1f}s stop={turn.end:.1f}s speaker_{speaker}"
-            )
-
-        speaker_segments = parse_speaker_segments(speaker_str)
+        speaker_segments = _run_speaker_diarization(audio_path, pipeline)
         items = results[0].time_stamps.items
         speaker_segments_result = merge_to_speaker_segments(items, speaker_segments)
         speaker_segments_result = fix_unknown_speaker(speaker_segments_result)
