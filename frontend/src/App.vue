@@ -3,19 +3,7 @@
     <div class="main-content">
       <a-card class="function-card transcribe-card">
         <div class="transcribe-section">
-          <div class="mic-wrapper">
-            <div 
-              class="mic-button"
-              :class="{ 
-                recording: isRecording,
-                paused: isPaused
-              }"
-              @click="handleMicClick"
-            >
-              <AudioOutlined v-if="!isRecording || isPaused" class="mic-icon" />
-              <SoundOutlined v-else class="mic-icon recording-icon" />
-            </div>
-          </div>
+          <MicButton :is-recording="isRecording" :is-paused="isPaused" @click="handleMicClick" />
           
           <div class="record-hint">
             <span v-if="isPaused">已暂停，点击继续</span>
@@ -67,66 +55,9 @@
         </div>
       </a-card>
 
-      <a-card v-if="results.length > 0" class="function-card" style="margin-top: 16px;">
-        <template #title>
-          <div class="result-title">
-            <span>识别结果</span>
-            <a-tag color="green">{{ results.length }} 条</a-tag>
-          </div>
-        </template>
-        <div class="result-list">
-          <div 
-            v-for="(item, index) in results" 
-            :key="index"
-            class="result-item"
-          >
-            <span v-if="item.speakerLoading" class="speaker-tag">
-              识别中...
-              <LoadingOutlined spin />
-            </span>
-            <span v-else class="speaker-tag" :class="getSpeakerClass(item.speaker)">
-              {{ formatSpeaker(item.speaker) }}
-            </span>
-            <span v-if="!item.speakerLoading" class="time">{{ formatTime(item.start_time) }} - {{ formatTime(item.end_time) }}秒</span>
-            <span class="text">{{ item.text }}</span>
-          </div>
-          
-          </div>
-      </a-card>
+      <ResultList :results="results" />
 
-      <a-card v-if="summary.visible" class="function-card summary-card">
-        <template #title>
-          <div class="result-title">
-            <span>识别汇总</span>
-          </div>
-        </template>
-        <div class="summary-content">
-          <div class="summary-grid">
-            <div class="summary-item">
-              <span class="label">识别结果条数</span>
-              <span class="value">{{ summary.totalCount }} 条</span>
-            </div>
-            <div class="summary-item">
-              <span class="label">说话人数</span>
-              <span class="value">{{ summary.speakerCount }} 人</span>
-            </div>
-            <div class="summary-item">
-              <span class="label">总时长</span>
-              <span class="value">{{ summary.totalDuration }} 秒</span>
-            </div>
-          </div>
-          <div class="speaker-stats">
-            <div 
-              v-for="(count, speaker) in summary.speakerStats" 
-              :key="speaker" 
-              class="speaker-stat-item"
-            >
-              <a-tag color="blue">{{ formatSpeaker(speaker) }}</a-tag>
-              <a-tag color="blue">{{ count }} 次</a-tag>
-            </div>
-          </div>
-        </div>
-      </a-card>
+      <ResultSummary :summary="summary" />
     </div>
 
     <div v-if="isRecognizing" class="recognizing-bar">
@@ -139,14 +70,16 @@
 import { ref, onUnmounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { 
-  AudioOutlined, 
-  SoundOutlined,
   DownloadOutlined,
   StopOutlined,
   PauseOutlined,
   CaretRightOutlined,
   LoadingOutlined
 } from '@ant-design/icons-vue'
+import MicButton from './components/MicButton.vue'
+import ResultList from './components/ResultList.vue'
+import ResultSummary from './components/ResultSummary.vue'
+import { mergeAudioSegments, float32ArrayToWav } from './utils/audio'
 
 const results = ref([])
 const isRecording = ref(false)
@@ -204,35 +137,13 @@ function getSpeakerClass(speaker) {
   return `speaker-${num}`
 }
 
-async function mergeAudioSegments(segments) {
-  if (!segments || segments.length === 0) return null
-  
-  const totalLength = segments.reduce((sum, seg) => sum + seg.length, 0)
-  const separatorLength = Math.floor(16000 * 0.5)
-  const merged = new Float32Array(totalLength + separatorLength * (segments.length - 1))
-  
-  let offset = 0
-  for (let i = 0; i < segments.length; i++) {
-    merged.set(segments[i], offset)
-    offset += segments[i].length
-    if (i < segments.length - 1) {
-      for (let j = 0; j < separatorLength; j++) {
-        merged[offset + j] = 0
-      }
-      offset += separatorLength
-    }
-  }
-  
-  return merged
-}
-
 function startTranscriptTimer() {
   if (transcriptTimer.value) return
   
   transcriptTimer.value = setInterval(async () => {
     if (audioSegments.value.length === 0) return
     
-    const mergedAudio = await mergeAudioSegments(audioSegments.value)
+    const mergedAudio = mergeAudioSegments(audioSegments.value)
     if (!mergedAudio || mergedAudio.length === 0) return
     
     const wavBlob = await float32ArrayToWav(mergedAudio)
@@ -412,57 +323,6 @@ async function sendViaWebSocket(base64Audio, isFinal = false) {
   })
 }
 
-async function float32ArrayToWav(float32Array, sampleRate = 16000) {
-  const wavHeader = createWavHeader(float32Array.length, sampleRate)
-  const wavData = new Uint8Array(wavHeader.length + float32Array.length * 2)
-  
-  wavData.set(wavHeader, 0)
-  
-  let offset = wavHeader.length
-  for (let i = 0; i < float32Array.length; i++) {
-    const sample = Math.max(-1, Math.min(1, float32Array[i]))
-    const intSample = sample < 0 ? sample * 32768 : sample * 32767
-    wavData[offset] = intSample & 0xff
-    wavData[offset + 1] = (intSample >> 8) & 0xff
-    offset += 2
-  }
-  
-  return new Blob([wavData], { type: 'audio/wav' })
-}
-
-function createWavHeader(numSamples, sampleRate) {
-  const buffer = new ArrayBuffer(44)
-  const view = new DataView(buffer)
-  
-  view.setUint8(0, 0x52)
-  view.setUint8(1, 0x49)
-  view.setUint8(2, 0x46)
-  view.setUint8(3, 0x46)
-  view.setUint32(4, 36 + numSamples * 2, true)
-  view.setUint8(8, 0x57)
-  view.setUint8(9, 0x41)
-  view.setUint8(10, 0x56)
-  view.setUint8(11, 0x45)
-  view.setUint8(12, 0x66)
-  view.setUint8(13, 0x6D)
-  view.setUint8(14, 0x74)
-  view.setUint8(15, 0x20)
-  view.setUint32(16, 16, true)
-  view.setUint16(20, 1, true)
-  view.setUint16(22, 1, true)
-  view.setUint32(24, sampleRate, true)
-  view.setUint32(28, sampleRate * 2, true)
-  view.setUint16(32, 2, true)
-  view.setUint16(34, 16, true)
-  view.setUint8(36, 0x64)
-  view.setUint8(37, 0x61)
-  view.setUint8(38, 0x74)
-  view.setUint8(39, 0x61)
-  view.setUint32(40, numSamples * 2, true)
-  
-  return new Uint8Array(buffer)
-}
-
 async function initVAD() {
   try {
     isInitializing.value = true
@@ -499,8 +359,8 @@ async function initVAD() {
           audioSegments.value.push(audio)
           fullAudioSegments.value.push(audio)
           
-          const mergedAudio = await mergeAudioSegments(audioSegments.value)
-          const fullMergedAudio = await mergeAudioSegments(fullAudioSegments.value)
+          const mergedAudio = mergeAudioSegments(audioSegments.value)
+          const fullMergedAudio = mergeAudioSegments(fullAudioSegments.value)
           
           if (mergedAudio && mergedAudio.length > 0) {
             const wavBlob = await float32ArrayToWav(mergedAudio)

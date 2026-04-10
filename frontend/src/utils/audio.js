@@ -97,3 +97,76 @@ export function downloadBlob(blob, filename) {
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
 }
+
+export function float32ArrayToWav(float32Array, sampleRate = 16000) {
+  const wavHeader = createWavHeader(float32Array.length, sampleRate)
+  const wavData = new Uint8Array(wavHeader.length + float32Array.length * 2)
+  
+  wavData.set(wavHeader, 0)
+  
+  let offset = wavHeader.length
+  for (let i = 0; i < float32Array.length; i++) {
+    const sample = Math.max(-1, Math.min(1, float32Array[i]))
+    const intSample = sample < 0 ? sample * 32768 : sample * 32767
+    wavData[offset] = intSample & 0xff
+    wavData[offset + 1] = (intSample >> 8) & 0xff
+    offset += 2
+  }
+  
+  return new Blob([wavData], { type: 'audio/wav' })
+}
+
+function createWavHeader(numSamples, sampleRate) {
+  const buffer = new ArrayBuffer(44)
+  const view = new DataView(buffer)
+  
+  view.setUint8(0, 0x52)
+  view.setUint8(1, 0x49)
+  view.setUint8(2, 0x46)
+  view.setUint8(3, 0x46)
+  view.setUint32(4, 36 + numSamples * 2, true)
+  view.setUint8(8, 0x57)
+  view.setUint8(9, 0x41)
+  view.setUint8(10, 0x56)
+  view.setUint8(11, 0x45)
+  view.setUint8(12, 0x66)
+  view.setUint8(13, 0x6D)
+  view.setUint8(14, 0x74)
+  view.setUint8(15, 0x20)
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, 1, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 2, true)
+  view.setUint16(32, 2, true)
+  view.setUint16(34, 16, true)
+  view.setUint8(36, 0x64)
+  view.setUint8(37, 0x61)
+  view.setUint8(38, 0x74)
+  view.setUint8(39, 0x61)
+  view.setUint32(40, numSamples * 2, true)
+  
+  return new Uint8Array(buffer)
+}
+
+export function mergeAudioSegments(segments) {
+  if (!segments || segments.length === 0) return null
+  
+  const totalLength = segments.reduce((sum, seg) => sum + seg.length, 0)
+  const separatorLength = Math.floor(16000 * 0.5)
+  const merged = new Float32Array(totalLength + separatorLength * (segments.length - 1))
+  
+  let offset = 0
+  for (let i = 0; i < segments.length; i++) {
+    merged.set(segments[i], offset)
+    offset += segments[i].length
+    if (i < segments.length - 1) {
+      for (let j = 0; j < separatorLength; j++) {
+        merged[offset + j] = 0
+      }
+      offset += separatorLength
+    }
+  }
+  
+  return merged
+}
