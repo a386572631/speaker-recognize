@@ -173,17 +173,17 @@ const summary = ref({
 const API_KEY = 'wfy-9CmPH8HQ1jtGxcAC5PJxF7N9Z6teRZTM'
 const API_HOST = import.meta.env.VITE_API_HOST || '10.104.60.38'
 const API_PORT = import.meta.env.VITE_API_PORT || '5062'
-const WS_URL = `ws://${API_HOST}:${API_PORT}/ws`
-const WSS_URL = `wss://${API_HOST}:${API_PORT}/ws`
-const HTTP_URL = `http://${API_HOST}:${API_PORT}`
-const HTTPS_URL = `https://${API_HOST}:${API_PORT}`
+const API_BASE = '/api'
+const HTTP_URL = API_BASE
+const HTTPS_URL = `${API_BASE}/stt/speaker`
+const WS_URL = `wss://${API_HOST}:${API_PORT}/stt/speaker/ws`
+const WSS_URL = `wss://${API_HOST}:${API_PORT}/stt/speaker/ws`
 
 let vadInstance = null
 let ws = null
 
 function getBaseUrl() {
-  const protocol = window.location.protocol
-  return protocol === 'https:' ? HTTPS_URL : HTTP_URL
+  return HTTPS_URL
 }
 
 function formatSpeaker(speaker) {
@@ -226,9 +226,7 @@ async function mergeAudioSegments(segments) {
 
 function createWebSocket() {
   return new Promise((resolve, reject) => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${API_HOST}:${API_PORT}/ws`
-    const socket = new WebSocket(wsUrl)
+    const socket = new WebSocket(WS_URL)
     
     socket.onopen = () => {
       socket.send(`Authorization: Bearer ${API_KEY}`)
