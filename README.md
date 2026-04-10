@@ -7,15 +7,45 @@
 ```
 speaker-recognize/
 ├── backend/           # 后端 (FastAPI)
-│   ├── app/          # 应用代码
-│   ├── main.py       # 入口文件
+│   ├── app/
+│   │   ├── config.py      # 配置
+│   │   ├── main.py       # 应用入口
+│   │   ├── models.py
+│   │   ├── schemas.py
+│   │   ├── services.py
+│   │   ├── utils.py    # 工具
+│   │   └── routes/
+│   │       ├── openai_transcription.py
+│   │       ├── speech.py
+│   │       ├── transcribe.py
+│   │       └── websocket.py
+│   ├── main.py          # 入口文件
 │   ├── pyproject.toml
-│   └── .env          # 环境配置
-├── frontend/         # 前端 (Vue3 + AntDesign)
-│   └── src/
-│       └── App.vue
-├── Qwen/            # Qwen ASR模型
-└── pyannote/        # PyAnnote说话人分割模型
+│   ├── .env            # 环境配置
+│   ├── env.example     # 环境配置示例
+│   └── models/         # 下载的模型
+        ├── Qwen/             # Qwen ASR模型
+        └── pyannote/         # PyAnnote说话人分割模型
+        └── Fun-ASR-Nano-2512/
+├── frontend/          # 前端 (Vue3 + AntDesign)
+│   ├── src/
+│   │   ├── components/   # 组件
+│   │   │   ├── MicButton.vue      # 录音按钮
+│   │   │   ├── ResultItem.vue    # 单条识别结果
+│   │   │   ├── ResultList.vue   # 识别结果列表
+│   │   │   └── ResultSummary.vue # 识别汇总
+│   │   ├── utils/       # 工具
+│   │   │   ├── audio.js   # 音频处理
+│   │   │   └── websocket.js # WebSocket
+│   │   ├── assets/
+│   │   │   └── main.css
+│   │   ├── App.vue
+│   │   └── main.js
+│   ├── public/
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js
+│   └── .env.development # 开发环境配置
 ```
 
 ## 环境要求
