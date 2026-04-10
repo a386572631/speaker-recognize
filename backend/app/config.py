@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     api_key: str = Field(default="", alias="API_KEY")
     model_name: str = Field(default="Fun-ASR-Nano-2512", alias="MODEL_NAME")
     pyannote_token: str = Field(default="", alias="PYANNOTE_TOKEN")
+    tts_model: str = Field(default="Qwen3-TTS-12Hz-1.7B-CustomVoice", alias="TTS_MODEL")
+    tts_voice: str = Field(default="Vivian", alias="TTS_VOICE")
 
     @property
     def device(self) -> torch.device:
@@ -36,6 +38,10 @@ class Settings(BaseSettings):
     @property
     def pyannote_model_path(self) -> Path:
         return BASE_DIR / "models" / "pyannote" / "speaker-diarization-community-1"
+
+    @property
+    def tts_model_path(self) -> Path:
+        return BASE_DIR / "models" / "Qwen" / self.tts_model
 
     class Config:
         env_file = BASE_DIR / ".env"

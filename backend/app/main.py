@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .models import get_asr_model
-from .routes import websocket, openai_transcription, transcribe
+from .routes import websocket, openai_transcription, transcribe, speech
 
 
 @asynccontextmanager
@@ -15,6 +15,11 @@ async def lifespan(app: FastAPI):
     print(f"初始化模型: {settings.model_name}, 设备: {settings.device}")
     asr = get_asr_model()
     asr.init()
+    print(f"初始化TTS模型: {settings.tts_model}, 设备: {settings.device}")
+    from .models import get_tts_model
+
+    tts = get_tts_model()
+    tts.init()
     yield
 
 
@@ -32,6 +37,7 @@ app.include_router(websocket.router, tags=["websocket"])
 app.include_router(
     openai_transcription.router, prefix="/v1/audio", tags=["openai-transcription"]
 )
+app.include_router(speech.router, prefix="/v1/audio", tags=["speech"])
 app.include_router(transcribe.router, prefix="/transcribe", tags=["transcribe"])
 
 
