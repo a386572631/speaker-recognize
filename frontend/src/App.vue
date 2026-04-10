@@ -80,16 +80,15 @@
             :key="index"
             class="result-item"
           >
-            <div class="result-header">
-              <span class="speaker-tag" :class="getSpeakerClass(item.speaker)">
-                {{ formatSpeaker(item.speaker) }}
-                <span v-if="item.speakerLoading" class="speaker-loading">
-                  <LoadingOutlined spin />
-                </span>
-              </span>
-              <span class="time">{{ formatTime(item.start_time) }} - {{ formatTime(item.end_time) }}秒</span>
-            </div>
-            <div class="text">{{ item.text }}</div>
+            <span v-if="item.speakerLoading" class="speaker-tag">
+              识别中...
+              <LoadingOutlined spin />
+            </span>
+            <span v-else class="speaker-tag" :class="getSpeakerClass(item.speaker)">
+              {{ formatSpeaker(item.speaker) }}
+            </span>
+            <span v-if="!item.speakerLoading" class="time">{{ formatTime(item.start_time) }} - {{ formatTime(item.end_time) }}秒</span>
+            <span class="text">{{ item.text }}</span>
           </div>
           
           </div>
@@ -161,6 +160,9 @@ const recordedBlob = ref(null)
 const fullRecordedBlob = ref(null)
 const audioSegments = ref([])
 const fullAudioSegments = ref([])
+const pendingTranscripts = ref([])
+const transcriptTimer = ref(null)
+const MAX_TRANSCRIPT_INTERVAL = 2000
 
 const summary = ref({
   visible: false,
@@ -222,6 +224,39 @@ async function mergeAudioSegments(segments) {
   }
   
   return merged
+}
+
+function startTranscriptTimer() {
+  if (transcriptTimer.value) return
+  
+  transcriptTimer.value = setInterval(async () => {
+    if (audioSegments.value.length === 0) return
+    
+    const mergedAudio = await mergeAudioSegments(audioSegments.value)
+    if (!mergedAudio || mergedAudio.length === 0) return
+    
+    const wavBlob = await float32ArrayToWav(mergedAudio)
+    const arrayBuffer = await wavBlob.arrayBuffer()
+    const base64Audio = btoa(
+      new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+    )
+    
+    try {
+      const result = await sendViaWebSocket(base64Audio, false)
+      if (Array.isArray(result) && result.length > 0) {
+        pendingTranscripts.value.push(...result)
+      }
+    } catch (e) {
+      console.error('Transcription error:', e)
+    }
+  }, MAX_TRANSCRIPT_INTERVAL)
+}
+
+function stopTranscriptTimer() {
+  if (transcriptTimer.value) {
+    clearInterval(transcriptTimer.value)
+    transcriptTimer.value = null
+  }
 }
 
 function createWebSocket() {
@@ -302,17 +337,34 @@ async function identifySpeaker(index) {
     
     if (response.ok) {
       const data = await response.json()
-      if (data.results && data.results.length > 0) {
-        results.value[index] = data.results[data.results.length - 1]
-      } else if (data.last_speaker) {
+      
+      let httpTotalEndTime = 0
+      if (data.segments && data.segments.length > 0) {
+        httpTotalEndTime = data.segments[data.segments.length - 1].end_time
+      }
+      
+      if (httpTotalEndTime > 0) {
+        const wsStartTime = results.value[index].start_time ?? 0
+        const wsEndTime = results.value[index].end_time ?? 0
+        const wsDuration = wsEndTime - wsStartTime
+        
+        results.value[index].start_time = httpTotalEndTime - wsDuration
+        results.value[index].end_time = httpTotalEndTime
+      }
+      
+      if (data.last_speaker) {
         results.value[index].speaker = data.last_speaker
       }
     }
   } catch (error) {
     console.error('Speaker identification error:', error)
+    vadStatus.value = '说话人识别失败'
+    statusClass.value = 'error'
   } finally {
     results.value[index].speakerLoading = false
     isRecognizing.value = false
+    vadStatus.value = ''
+    statusClass.value = ''
   }
 }
 
@@ -433,8 +485,12 @@ async function initVAD() {
       onSpeechStart: () => {
         vadStatus.value = '检测到语音'
         statusClass.value = 'info'
+        startTranscriptTimer()
       },
       onSpeechEnd: async (audio) => {
+        clearInterval(transcriptTimer.value)
+        transcriptTimer.value = null
+        
         vadStatus.value = '语音结束，正在识别...'
         statusClass.value = 'processing'
         isRecognizing.value = true
@@ -493,43 +549,79 @@ async function initVAD() {
 }
 
 async function transcribeCurrentAudio() {
-  if (!recordedBlob.value) return
+  let result = null
+  let wsFinalResult = null
 
-  const audioSize = recordedBlob.value.size
-  if (audioSize < 1000) return
+  if (recordedBlob.value) {
+    const audioSize = recordedBlob.value.size
+    if (audioSize < 1000) return
 
-  try {
     loading.value = true
-
     const arrayBuffer = await recordedBlob.value.arrayBuffer()
     const base64Audio = btoa(
       new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
     )
+    wsFinalResult = await sendViaWebSocket(base64Audio, true)
+    loading.value = false
+  }
 
-    const result = await sendViaWebSocket(base64Audio, false)
-    
-    if (Array.isArray(result) && result.length > 0) {
-      const lastResult = result[result.length - 1]
-      const newItem = {
-        ...lastResult,
-        speaker: '识别中',
-        speakerLoading: true
+  if (pendingTranscripts.value.length > 0 && wsFinalResult?.length > 0) {
+    result = [...pendingTranscripts.value, ...wsFinalResult]
+    pendingTranscripts.value = []
+  } else if (wsFinalResult?.length > 0) {
+    result = wsFinalResult
+  } else if (pendingTranscripts.value.length > 0) {
+    result = pendingTranscripts.value
+    pendingTranscripts.value = []
+  }
+
+  if (!result || result.length === 0) return
+
+  try {
+    const httpTotalEndTime = result[result.length - 1].end_time || 0
+
+    const adjustedResult = result.map((r, idx) => {
+      const startTime = r.start_time ?? 0
+      const endTime = r.end_time ?? 0
+      if (idx === result.length - 1) {
+        return { ...r, start_time: startTime, end_time: httpTotalEndTime }
       }
-      results.value.push(newItem)
-      
-      vadStatus.value = '识别完成，正在识别说话人...'
-      statusClass.value = 'success'
-      
-      identifySpeaker(results.value.length - 1)
+      let nextResult = result[idx + 1]
+      let nextStartTime = nextResult?.start_time ?? 0
+      let nextEndTime = nextResult?.end_time ?? 0
+      let nextDuration = nextEndTime - nextStartTime
+      return {
+        ...r,
+        start_time: startTime,
+        end_time: nextEndTime
+      }
+    })
+
+    const mergedText = adjustedResult.map(r => r.text).join('')
+    const mergedStartTime = adjustedResult[0]?.start_time ?? 0
+    const mergedEndTime = adjustedResult[adjustedResult.length - 1]?.end_time ?? httpTotalEndTime
+
+    const newItem = {
+      text: mergedText,
+      start_time: mergedStartTime,
+      end_time: mergedEndTime,
+      speaker: '识别中',
+      speakerLoading: true
     }
+    results.value.push(newItem)
+    
+    vadStatus.value = '识别完成正在识别说话人...'
+    statusClass.value = 'success'
+    
+    identifySpeaker(results.value.length - 1)
   } catch (error) {
     vadStatus.value = '识别失败: ' + error.message
     statusClass.value = 'error'
     isRecognizing.value = false
-  } finally {
+  }
     loading.value = false
   }
-}
+
 
 async function handleMicClick() {
   if (!isRecording.value) {
@@ -554,11 +646,13 @@ async function onStartRecording() {
   fullAudioSegments.value = []
   recordedBlob.value = null
   fullRecordedBlob.value = null
+  pendingTranscripts.value = []
   message.success('开始录音')
 }
 
 function onPauseRecording() {
   isPaused.value = true
+  stopTranscriptTimer()
   
   if (vadInstance) {
     vadInstance.pause()
@@ -576,14 +670,18 @@ async function onResumeRecording() {
   
   isPaused.value = false
   isRecording.value = true
+  pendingTranscripts.value = []
   vadStatus.value = '录音中...'
   statusClass.value = 'info'
+  startTranscriptTimer()
   message.success('继续录音')
 }
 
 function onStopRecording() {
   isRecording.value = false
   isPaused.value = false
+  
+  stopTranscriptTimer()
   
   if (vadInstance) {
     vadInstance.pause()
@@ -592,6 +690,7 @@ function onStopRecording() {
   calculateSummary()
   
   audioSegments.value = []
+  pendingTranscripts.value = []
   vadStatus.value = ''
   statusClass.value = ''
   message.success('录音已停止')
@@ -685,7 +784,7 @@ onUnmounted(() => {
 }
 
 .transcribe-card :deep(.ant-card-body) {
-  padding: 40px 24px;
+  padding: 16px !important;
 }
 
 .transcribe-section {
@@ -806,7 +905,7 @@ onUnmounted(() => {
   padding: 12px 16px;
   background: #fafafa;
   border-radius: 0 0 8px 8px;
-  margin: 0 -24px -24px -24px;
+  margin: 0 -16px -16px -16px;
 }
 
 .button-row :deep(.ant-btn) {
@@ -846,10 +945,32 @@ onUnmounted(() => {
 }
 
 .result-item {
-  padding: 16px;
+  padding: 8px 12px;
   background: #fafafa;
   border-radius: 8px;
   border: 1px solid #f0f0f0;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.speaker-tag {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.time {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
 }
 
 .result-item:first-child {
