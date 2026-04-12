@@ -2,9 +2,10 @@ import os
 import torch
 from pathlib import Path
 from functools import lru_cache
+from typing import Union
 
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, field_validator
 
 
 BASE_DIR = Path(__file__).parent.parent
@@ -16,7 +17,18 @@ class Settings(BaseSettings):
     pyannote_token: str = Field(default="", alias="PYANNOTE_TOKEN")
     tts_model: str = Field(default="Qwen3-TTS-12Hz-1.7B-CustomVoice", alias="TTS_MODEL")
     tts_voice: str = Field(default="Vivian", alias="TTS_VOICE")
-    use_funasr_diarization: bool = Field(default=False, alias="USE_FUNASR_DIARIZATION")
+    use_funasr_diarization: Union[bool, str] = Field(
+        default=False, alias="USE_FUNASR_DIARIZATION"
+    )
+
+    @field_validator("use_funasr_diarization", mode="before")
+    @classmethod
+    def parse_bool(cls, v: Union[bool, str]) -> bool:
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            return v.lower() in ("true", "1", "yes")
+        return bool(v)
 
     @property
     def device(self) -> torch.device:
