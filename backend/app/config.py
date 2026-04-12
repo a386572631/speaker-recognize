@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     pyannote_token: str = Field(default="", alias="PYANNOTE_TOKEN")
     tts_model: str = Field(default="Qwen3-TTS-12Hz-1.7B-CustomVoice", alias="TTS_MODEL")
     tts_voice: str = Field(default="Vivian", alias="TTS_VOICE")
+    use_funasr_diarization: bool = Field(default=False, alias="USE_FUNASR_DIARIZATION")
 
     @property
     def device(self) -> torch.device:
@@ -38,6 +39,28 @@ class Settings(BaseSettings):
     @property
     def pyannote_model_path(self) -> Path:
         return BASE_DIR / "models" / "pyannote" / "speaker-diarization-community-1"
+
+    @property
+    def vad_model_path(self) -> Path:
+        return BASE_DIR / "models" / "speech_fsmn_vad_zh-cn-16k-common-pytorch"
+
+    @property
+    def spk_model_path(self) -> Path:
+        return BASE_DIR / "models" / "speech_campplus_sv_zh-cn_16k-common"
+
+    @property
+    def paraformer_model_path(self) -> Path:
+        return (
+            BASE_DIR
+            / "models"
+            / "speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch"
+        )
+
+    @property
+    def punc_model_path(self) -> Path:
+        return (
+            BASE_DIR / "models" / "punc_ct-transformer_cn-en-common-vocab471067-large"
+        )
 
     @property
     def tts_model_path(self) -> Path:

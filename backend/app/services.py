@@ -30,36 +30,96 @@ def _run_speaker_diarization(audio_path: str, pipeline) -> List[dict]:
     return parse_speaker_segments(speaker_str)
 
 
+def _run_speaker_diarization_funasr(audio_path: str) -> List[dict]:
+    asr = get_asr_model()
+    funasr_model = asr.funasr_spk_model
+
+    results = funasr_model.generate(
+        input=audio_path, batch_size_s=300, spk_diarization=True
+    )
+
+    if not results or not results[0].get("sentence_info"):
+        return []
+
+    segments = []
+    speaker_counter = 1
+    speaker_labels = {}
+
+    for sentence in results[0]["sentence_info"]:
+        spk = sentence.get("spk", 0)
+        if spk not in speaker_labels:
+            speaker_labels[spk] = f"SPEAKER_{speaker_counter}"
+            speaker_counter += 1
+
+        segments.append(
+            {
+                "text": sentence.get("text", ""),
+                "speaker": speaker_labels[spk],
+                "start_time": sentence.get("start", 0) / 1000.0,
+                "end_time": sentence.get("end", 0) / 1000.0,
+            }
+        )
+
+    return segments
+
+
 def transcribe_audio(audio_path: str) -> List[dict]:
     asr = get_asr_model()
     pipeline = asr.pipeline
     settings = get_settings()
 
     if settings.model_name == "Fun-ASR-Nano-2512":
-        funasr_model = asr.funasr_model
-        results = funasr_model.generate(input=[audio_path], batch_size_s=300)
-        text = results[0].get("text", "")
+        funasr_nano = asr.funasr_nano_model
+        funasr_nano_kwargs = asr.funasr_nano_kwargs
+        results = funasr_nano.inference(data_in=[audio_path], **funasr_nano_kwargs)
+        text = results[0][0].get("text", "")
 
-        speaker_segments = _run_speaker_diarization(audio_path, pipeline)
+        if settings.use_funasr_diarization:
+            speaker_segments = _run_speaker_diarization_funasr(audio_path)
+        else:
+            speaker_segments = _run_speaker_diarization(audio_path, pipeline)
 
-        return [
-            {
-                "text": text,
-                "speaker": speaker_segments[0].get("speaker", "SPEAKER_1")
-                if speaker_segments
-                else "SPEAKER_1",
-                "start_time": 0.0,
-                "end_time": 0.0,
-            }
-        ]
+        if not speaker_segments:
+            return [
+                {
+                    "text": text,
+                    "speaker": "SPEAKER_1",
+                    "start_time": 0.0,
+                    "end_time": 0.0,
+                }
+            ]
+
+        from typing import NamedTuple
+
+        class ForcedAlignItem(NamedTuple):
+            text: str
+            start_time: float
+            end_time: float
+
+        items = []
+        for i in results[0][0].get("timestamps", []):
+            items.append(
+                ForcedAlignItem(
+                    text=i["token"], start_time=i["start_time"], end_time=i["end_time"]
+                )
+            )
+
+        speaker_segments_result = merge_to_speaker_segments(items, speaker_segments)
+        speaker_segments_result = fix_unknown_speaker(speaker_segments_result)
+        return speaker_segments_result
     else:
         model = asr.qwen_model
         results = model.transcribe(
             audio=audio_path, language="Chinese", return_time_stamps=True
         )
 
-        speaker_segments = _run_speaker_diarization(audio_path, pipeline)
+        if settings.use_funasr_diarization:
+            speaker_segments = _run_speaker_diarization_funasr(audio_path)
+        else:
+            speaker_segments = _run_speaker_diarization(audio_path, pipeline)
+
         items = results[0].time_stamps.items
+        print(f"items:{items}")
         speaker_segments_result = merge_to_speaker_segments(items, speaker_segments)
         speaker_segments_result = fix_unknown_speaker(speaker_segments_result)
 

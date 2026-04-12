@@ -1,3 +1,4 @@
+import sys
 import torch
 from pathlib import Path
 from typing import Optional, Any
@@ -8,12 +9,23 @@ from funasr import AutoModel
 
 from .config import get_settings
 
+FUNASR_NANO_PATH = (
+    Path(__file__).parent.parent / "models" / "Fun-ASR-Nano-2512" / "tmp_funassr"
+)
+if FUNASR_NANO_PATH.exists() and str(FUNASR_NANO_PATH) not in sys.path:
+    sys.path.insert(0, str(FUNASR_NANO_PATH))
+
+from .funasr.model import FunASRNano
+
 
 class ASRModel:
     _instance: Optional["ASRModel"] = None
     _model: Optional[Any] = None
     _qwen_model: Optional[Qwen3ASRModel] = None
     _funasr_model: Optional[AutoModel] = None
+    _funasr_nano_model: Optional[Any] = None
+    _funasr_nano_kwargs: Optional[dict] = None
+    _funasr_spk_model: Optional[AutoModel] = None
     _pipeline: Optional[Pipeline] = None
 
     def __new__(cls):
@@ -29,12 +41,13 @@ class ASRModel:
         device_str = str(settings.device)
 
         if settings.model_name == "Fun-ASR-Nano-2512":
-            self._funasr_model = AutoModel(
-                model="FunAudioLLM/Fun-ASR-Nano-2512",
-                vad_model="fsmn-vad",
-                vad_kwargs={"max_single_segment_time": 30000},
-                device=device_str,
+            self._funasr_nano_model, self._funasr_nano_kwargs = (
+                FunASRNano.from_pretrained(
+                    model=str(settings.model_path),
+                    device=device_str,
+                )
             )
+            self._funasr_nano_model.eval()
         else:
             self._qwen_model = Qwen3ASRModel.from_pretrained(
                 str(settings.model_path),
@@ -70,6 +83,18 @@ class ASRModel:
         return self._funasr_model
 
     @property
+    def funasr_nano_model(self) -> Optional[Any]:
+        if self._funasr_nano_model is None:
+            self.init()
+        return self._funasr_nano_model
+
+    @property
+    def funasr_nano_kwargs(self) -> Optional[dict]:
+        if self._funasr_nano_kwargs is None:
+            self.init()
+        return self._funasr_nano_kwargs
+
+    @property
     def qwen_model(self) -> Optional[Qwen3ASRModel]:
         if self._qwen_model is None:
             self.init()
@@ -80,6 +105,21 @@ class ASRModel:
         if self._pipeline is None:
             self.init()
         return self._pipeline
+
+    @property
+    def funasr_spk_model(self) -> Optional[AutoModel]:
+        if self._funasr_spk_model is None:
+            settings = get_settings()
+            device_str = str(settings.device)
+            self._funasr_spk_model = AutoModel(
+                model=str(settings.paraformer_model_path),
+                vad_model=str(settings.vad_model_path),
+                punc_model=str(settings.punc_model_path),
+                spk_model=str(settings.spk_model_path),
+                device=device_str,
+                trust_remote_code=True
+            )
+        return self._funasr_spk_model
 
 
 asr_model = ASRModel()
