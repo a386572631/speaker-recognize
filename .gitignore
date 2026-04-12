@@ -21,6 +21,7 @@ large_tool_results/
 .idea/
 .env
 backend/models/**
+backend/uv.lock
 speaker-verify.md
 **/.ruff_cache
 .DS_Store
