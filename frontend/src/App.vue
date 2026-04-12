@@ -11,11 +11,11 @@
             <span v-else>点击开始录音</span>
           </div>
           
-          <div v-if="vadStatus" class="vad-status" :class="statusClass">
+          <div class="vad-status" :class="statusClass" :style="{ opacity: vadStatus ? 1 : 0 }">
             {{ vadStatus }}
           </div>
           
-          <div v-if="isInitializing" class="vad-status initializing">
+          <div class="vad-status initializing" :style="{ opacity: isInitializing ? 1 : 0 }">
             <LoadingOutlined spin /> VAD初始化中...
           </div>
           
@@ -653,7 +653,6 @@ onUnmounted(() => {
   align-items: center;
   gap: 16px;
   position: relative;
-  padding-bottom: 60px;
 }
 
 .mic-wrapper {
@@ -714,7 +713,10 @@ onUnmounted(() => {
 }
 
 .vad-status {
+  min-height: 37px;
+  line-height: 20px;
   padding: 8px 16px;
+  box-sizing: border-box;
   border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
