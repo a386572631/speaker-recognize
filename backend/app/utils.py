@@ -21,6 +21,7 @@ def parse_speaker_segments(speaker_str: str) -> List[Tuple[float, float, str]]:
 def merge_to_speaker_segments(
     align_items: List[Any], speaker_segments: List[Tuple[float, float, str]]
 ) -> List[dict]:
+    print(f"speaker_segments:{speaker_segments}")
     if not align_items or not speaker_segments:
         return []
 

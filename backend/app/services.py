@@ -27,7 +27,7 @@ def _run_speaker_diarization(
 
     speaker_str = ""
     for turn, speaker in output.speaker_diarization:
-        speaker_str += f"start={turn.start:.1f}s stop={turn.end:.1f}s speaker_{speaker}"
+        speaker_str += f"start={turn.start:.1f}s stop={turn.end:.1f}s speaker_{speaker} "
 
     return parse_speaker_segments(speaker_str)
 
