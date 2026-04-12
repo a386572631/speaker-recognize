@@ -20,7 +20,8 @@ dependencies = [
 #    "qwen-tts==0.0.5",
     "transformers==4.57.6",
     "soundfile",
-    "edge-tts"
+    "edge-tts",
+    "openai-whisper"
 ]
 
 [dependency-groups]
