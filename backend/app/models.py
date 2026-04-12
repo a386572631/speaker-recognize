@@ -111,11 +111,20 @@ class ASRModel:
         if self._funasr_spk_model is None:
             settings = get_settings()
             device_str = str(settings.device)
+            # self._funasr_spk_model = AutoModel(
+            #     model=str(settings.paraformer_model_path),
+            #     model_type="paraformer",
+            #     vad_model=str(settings.vad_model_path),
+            #     punc_model=str(settings.punc_model_path),
+            #     spk_model=str(settings.spk_model_path),
+            #     device=device_str,
+            #     trust_remote_code=True
+            # )
             self._funasr_spk_model = AutoModel(
-                model=str(settings.paraformer_model_path),
-                vad_model=str(settings.vad_model_path),
-                punc_model=str(settings.punc_model_path),
-                spk_model=str(settings.spk_model_path),
+                model="paraformer-zh",
+                vad_model="fsmn-vad",
+                punc_model="ct-punc",
+                spk_model="cam++",
                 device=device_str,
                 trust_remote_code=True
             )

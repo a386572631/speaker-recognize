@@ -3,7 +3,7 @@ import json
 import base64
 import tempfile
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import numpy as np
 from pydub import AudioSegment
@@ -17,7 +17,9 @@ from .utils import (
 )
 
 
-def _run_speaker_diarization(audio_path: str, pipeline) -> List[dict]:
+def _run_speaker_diarization(
+    audio_path: str, pipeline
+) -> List[Tuple[float, float, str]]:
     from pyannote.audio.pipelines.utils.hook import ProgressHook
 
     with ProgressHook() as hook:
@@ -30,7 +32,7 @@ def _run_speaker_diarization(audio_path: str, pipeline) -> List[dict]:
     return parse_speaker_segments(speaker_str)
 
 
-def _run_speaker_diarization_funasr(audio_path: str) -> List[dict]:
+def _run_speaker_diarization_funasr(audio_path: str) -> List[Tuple[float, float, str]]:
     asr = get_asr_model()
     funasr_model = asr.funasr_spk_model
 
@@ -52,15 +54,14 @@ def _run_speaker_diarization_funasr(audio_path: str) -> List[dict]:
             speaker_counter += 1
 
         segments.append(
-            {
-                "text": sentence.get("text", ""),
-                "speaker": speaker_labels[spk],
-                "start_time": sentence.get("start", 0) / 1000.0,
-                "end_time": sentence.get("end", 0) / 1000.0,
-            }
+            (
+                sentence.get("start", 0) / 1000.0,
+                sentence.get("end", 0) / 1000.0,
+                speaker_labels[spk],
+            )
         )
 
-    return segments
+    return sorted(segments, key=lambda x: x[0])
 
 
 def transcribe_audio(audio_path: str) -> List[dict]:
@@ -119,7 +120,7 @@ def transcribe_audio(audio_path: str) -> List[dict]:
             speaker_segments = _run_speaker_diarization(audio_path, pipeline)
 
         items = results[0].time_stamps.items
-        print(f"items:{items}")
+
         speaker_segments_result = merge_to_speaker_segments(items, speaker_segments)
         speaker_segments_result = fix_unknown_speaker(speaker_segments_result)
 
