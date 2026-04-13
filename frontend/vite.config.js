@@ -10,14 +10,14 @@ export default defineConfig(({ mode }) => {
     server: {
       host: '0.0.0.0',
       port: 3000,
-      proxy: {
+      proxy: mode === 'development' ? {
         '/api': {
-          target: `https://${env.VITE_API_HOST}:${env.VITE_API_PORT}`,
+          target: env.VITE_API_BASE_URL,
           changeOrigin: true,
           secure: false,
           rewrite: (path) => path.replace(/^\/api/, ''),
         },
-      },
+      } : {},
     },
   }
 })

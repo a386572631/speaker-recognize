@@ -105,14 +105,12 @@ const summary = ref({
   speakerStats: {}
 })
 
+const isDev = import.meta.env.MODE === 'development'
 const API_KEY = 'wfy-9CmPH8HQ1jtGxcAC5PJxF7N9Z6teRZTM'
-const API_HOST = import.meta.env.VITE_API_HOST || '10.104.60.38'
-const API_PORT = import.meta.env.VITE_API_PORT || '5062'
-const API_BASE = '/api'
-const HTTP_URL = API_BASE
-const HTTPS_URL = `${API_BASE}/stt/speaker`
-const WS_URL = `wss://${API_HOST}:${API_PORT}/stt/speaker/ws`
-const WSS_URL = `wss://${API_HOST}:${API_PORT}/stt/speaker/ws`
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+const API_BASE_WS = import.meta.env.VITE_API_BASE_WS
+const HTTPS_URL = isDev ? `/api/stt/speaker` : `${API_BASE_URL}/stt/speaker`
+const WSS_URL = `${API_BASE_WS}/stt/speaker/ws`
 
 let vadInstance = null
 let ws = null
@@ -172,7 +170,7 @@ function stopTranscriptTimer() {
 
 function createWebSocket() {
   return new Promise((resolve, reject) => {
-    const socket = new WebSocket(WS_URL)
+    const socket = new WebSocket(WSS_URL)
     
     socket.onopen = () => {
       socket.send(`Authorization: Bearer ${API_KEY}`)
