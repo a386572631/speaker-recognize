@@ -67,7 +67,7 @@ def _run_speaker_diarization_funasr(audio_path: str) -> List[Tuple[float, float,
     return sorted(segments, key=lambda x: x[0])
 
 
-def transcribe_audio(audio_path: str) -> List[dict]:
+def transcribe_audio(audio_path: str, use_diarization: bool = False) -> List[dict]:
     if audio_path.endswith(".webm"):
         audio = AudioSegment.from_file(audio_path, format="webm")
         audio = audio.set_frame_rate(16000).set_channels(2)
@@ -85,6 +85,16 @@ def transcribe_audio(audio_path: str) -> List[dict]:
         funasr_nano_kwargs = asr.funasr_nano_kwargs
         results = funasr_nano.inference(data_in=[audio_path], **funasr_nano_kwargs)
         text = results[0][0].get("text", "")
+        print(f"results:{results}")
+        if not use_diarization:
+            return [
+                {
+                    "text": text,
+                    "speaker": "SPEAKER_1",
+                    "start_time": 0.0,
+                    "end_time": 0.0,
+                }
+            ]
 
         if settings.use_funasr_diarization:
             speaker_segments = _run_speaker_diarization_funasr(audio_path)
@@ -125,6 +135,16 @@ def transcribe_audio(audio_path: str) -> List[dict]:
             audio=audio_path, language="Chinese", return_time_stamps=True
         )
 
+        if not use_diarization:
+            return [
+                {
+                    "text": results[0].text,
+                    "speaker": "SPEAKER_1",
+                    "start_time": 0.0,
+                    "end_time": 0.0,
+                }
+            ]
+
         if settings.use_funasr_diarization:
             speaker_segments = _run_speaker_diarization_funasr(audio_path)
         else:
@@ -138,7 +158,9 @@ def transcribe_audio(audio_path: str) -> List[dict]:
         return speaker_segments_result
 
 
-def transcribe_audio_bytes(audio_bytes: bytes) -> List[dict]:
+def transcribe_audio_bytes(
+    audio_bytes: bytes, use_diarization: bool = True
+) -> List[dict]:
     audio_bytesio = io.BytesIO(audio_bytes)
     audio_bytesio.seek(0)
     header_bytes = audio_bytesio.read(16)
@@ -164,7 +186,7 @@ def transcribe_audio_bytes(audio_bytes: bytes) -> List[dict]:
             os.remove(temp_path)
             temp_path = new_path
 
-        return transcribe_audio(temp_path)
+        return transcribe_audio(temp_path, use_diarization)
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
@@ -175,9 +197,11 @@ def transcribe_audio_bytes(audio_bytes: bytes) -> List[dict]:
                 pass
 
 
-def transcribe_audio_base64(audio_base64: str) -> List[dict]:
+def transcribe_audio_base64(
+    audio_base64: str, use_diarization: bool = True
+) -> List[dict]:
     audio_bytes = base64.b64decode(audio_base64)
-    return transcribe_audio_bytes(audio_bytes)
+    return transcribe_audio_bytes(audio_bytes, use_diarization)
 
 
 def get_last_speaker(segments: List[dict]) -> str:

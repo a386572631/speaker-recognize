@@ -33,6 +33,7 @@ async def create_transcription(
     language: str = Query(None),
     prompt: str = Query(None),
     temperature: float = Query(0.0, ge=0.0, le=2.0),
+    use_diarization: bool = Query(False),
 ):
     await verify_auth(authorization)
 
@@ -65,7 +66,7 @@ async def create_transcription(
         with open(temp_path, "wb") as f:
             f.write(content)
 
-        segments = transcribe_audio(temp_path)
+        segments = transcribe_audio(temp_path, use_diarization)
         text = " ".join([s["text"] for s in segments])
         total_tokens = len(text) // 4
         duration = segments[-1]["end_time"] if segments else 0
