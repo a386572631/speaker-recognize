@@ -6,6 +6,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '', '')
   return {
     plugins: [vue()],
+    base: mode === 'production' ? '/stt/' : '/',
     server: {
       host: '0.0.0.0',
       port: 3000,
