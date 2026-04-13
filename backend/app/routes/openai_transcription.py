@@ -65,14 +65,6 @@ async def create_transcription(
         with open(temp_path, "wb") as f:
             f.write(content)
 
-        if filename.rsplit(".", 1)[1].lower() == "webm":
-            audio = AudioSegment.from_file(temp_path, format="webm")
-            audio = audio.set_frame_rate(16000).set_channels(2)
-            new_path = os.path.join(temp_dir, f"{uuid.uuid4()}.mp3")
-            audio.export(new_path, format="mp3")
-            os.remove(temp_path)
-            temp_path = new_path
-
         segments = transcribe_audio(temp_path)
         text = " ".join([s["text"] for s in segments])
         total_tokens = len(text) // 4

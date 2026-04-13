@@ -1,4 +1,5 @@
 import os
+import io
 import json
 import base64
 import tempfile
@@ -27,7 +28,9 @@ def _run_speaker_diarization(
 
     speaker_str = ""
     for turn, speaker in output.speaker_diarization:
-        speaker_str += f"start={turn.start:.1f}s stop={turn.end:.1f}s speaker_{speaker} "
+        speaker_str += (
+            f"start={turn.start:.1f}s stop={turn.end:.1f}s speaker_{speaker} "
+        )
 
     return parse_speaker_segments(speaker_str)
 
@@ -65,6 +68,14 @@ def _run_speaker_diarization_funasr(audio_path: str) -> List[Tuple[float, float,
 
 
 def transcribe_audio(audio_path: str) -> List[dict]:
+    if audio_path.endswith(".webm"):
+        audio = AudioSegment.from_file(audio_path, format="webm")
+        audio = audio.set_frame_rate(16000).set_channels(2)
+        new_path = audio_path.replace(".webm", ".wav")
+        audio.export(new_path, format="wav")
+        os.remove(audio_path)
+        audio_path = new_path
+
     asr = get_asr_model()
     pipeline = asr.pipeline
     settings = get_settings()
@@ -128,13 +139,30 @@ def transcribe_audio(audio_path: str) -> List[dict]:
 
 
 def transcribe_audio_bytes(audio_bytes: bytes) -> List[dict]:
-    unique_filename = f"{uuid.uuid4()}.wav"
+    audio_bytesio = io.BytesIO(audio_bytes)
+    audio_bytesio.seek(0)
+    header_bytes = audio_bytesio.read(16)
+    audio_bytesio.seek(0)
+
+    if header_bytes[:4] == b"\x1aE\xdf\xa3":
+        unique_filename = f"{uuid.uuid4()}.webm"
+    else:
+        unique_filename = f"{uuid.uuid4()}.wav"
+
     temp_dir = tempfile.mkdtemp()
     temp_path = os.path.join(temp_dir, unique_filename)
 
     try:
         with open(temp_path, "wb") as f:
             f.write(audio_bytes)
+
+        if temp_path.endswith(".webm"):
+            audio = AudioSegment.from_file(temp_path, format="webm")
+            audio = audio.set_frame_rate(16000).set_channels(2)
+            new_path = os.path.join(temp_dir, f"{uuid.uuid4()}.wav")
+            audio.export(new_path, format="wav")
+            os.remove(temp_path)
+            temp_path = new_path
 
         return transcribe_audio(temp_path)
     finally:
