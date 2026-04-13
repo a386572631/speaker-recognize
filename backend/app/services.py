@@ -23,7 +23,7 @@ def _run_speaker_diarization(
     from pyannote.audio.pipelines.utils.hook import ProgressHook
 
     with ProgressHook() as hook:
-        output = pipeline(audio_path, hook=hook)
+        output = pipeline(audio_path, hook=hook, min_speakers=1, max_speakers=3)
 
     speaker_str = ""
     for turn, speaker in output.speaker_diarization:
