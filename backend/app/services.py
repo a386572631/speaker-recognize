@@ -28,6 +28,7 @@ def _run_speaker_diarization(
 
     speaker_str = ""
     for turn, speaker in output.speaker_diarization:
+        print(f"start={turn.start:.1f}s stop={turn.end:.1f}s speaker_{speaker} ")
         speaker_str += (
             f"start={turn.start:.1f}s stop={turn.end:.1f}s speaker_{speaker} "
         )
@@ -63,7 +64,7 @@ def _run_speaker_diarization_funasr(audio_path: str) -> List[Tuple[float, float,
                 speaker_labels[spk],
             )
         )
-
+    print(f"segments:{segments}")
     return sorted(segments, key=lambda x: x[0])
 
 

@@ -15,13 +15,39 @@ def parse_speaker_segments(speaker_str: str) -> List[Tuple[float, float, str]]:
         speaker = match[2]
         segments.append((start, stop, speaker))
     segments.sort(key=lambda x: x[0])
-    return segments
+
+    if not segments:
+        return segments
+
+    split_segments = []
+    current = segments[0]
+
+    for next_seg in segments[1:]:
+        if next_seg[0] < current[1]:
+            if next_seg[2] != current[2]:
+                if current[0] < next_seg[0]:
+                    split_segments.append((current[0], next_seg[0], current[2]))
+                split_segments.append(
+                    (next_seg[0], min(current[1], next_seg[1]), next_seg[2])
+                )
+                if current[1] > next_seg[1]:
+                    split_segments.append((next_seg[1], current[1], current[2]))
+                current = next_seg
+            else:
+                current = (current[0], max(current[1], next_seg[1]), current[2])
+        else:
+            split_segments.append(current)
+            current = next_seg
+
+    split_segments.append(current)
+    return split_segments
 
 
 def merge_to_speaker_segments(
     align_items: List[Any], speaker_segments: List[Tuple[float, float, str]]
 ) -> List[dict]:
     print(f"speaker_segments:{speaker_segments}")
+    print(f"align_items count: {len(align_items)}")
     if not align_items or not speaker_segments:
         return []
 
@@ -39,15 +65,18 @@ def merge_to_speaker_segments(
     current_start_time = None
     current_end_time = None
 
+    seg_idx = 0
     for item in align_items:
         char_mid = (item.start_time + item.end_time) / 2
-        target_speaker = None
-        for start, stop, speaker in speaker_segments:
-            if start - 0.05 <= char_mid <= stop + 0.05:
-                target_speaker = speaker
+        while seg_idx < len(sorted_segments):
+            start, stop, speaker = sorted_segments[seg_idx]
+            if char_mid >= start and char_mid <= stop + 0.1:
                 break
+            seg_idx += 1
 
-        if target_speaker is None:
+        if seg_idx < len(sorted_segments):
+            target_speaker = speaker
+        else:
             target_speaker = current_speaker
 
         if target_speaker != current_speaker:
