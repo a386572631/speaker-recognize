@@ -40,12 +40,13 @@ async def handle_json(request: Request):
     body = await request.json()
     audio_base64 = body.get("audio")
     use_diarization = body.get("use_diarization", True)
+    num_speaker = body.get("num_speaker", 0)
 
     if not audio_base64:
         raise HTTPException(status_code=400, detail="No audio data")
 
     try:
-        segments = transcribe_audio_base64(audio_base64, use_diarization)
+        segments = transcribe_audio_base64(audio_base64, use_diarization, num_speaker)
         last_speaker = get_last_speaker(segments)
 
         return JSONResponse(
@@ -63,6 +64,8 @@ async def handle_multipart(request: Request):
     file = form.get("file")
     use_diarization_str = form.get("use_diarization", "true")
     use_diarization = use_diarization_str.lower() == "true"
+    num_speaker_str = form.get("num_speaker", "0")
+    num_speaker = int(num_speaker_str) if num_speaker_str else 0
 
     if not file:
         raise HTTPException(status_code=400, detail="No file uploaded")
@@ -83,7 +86,7 @@ async def handle_multipart(request: Request):
         with open(temp_path, "wb") as f:
             f.write(content)
 
-        segments = transcribe_audio(temp_path, use_diarization)
+        segments = transcribe_audio(temp_path, use_diarization, num_speaker)
         last_speaker = get_last_speaker(segments)
 
         return JSONResponse(

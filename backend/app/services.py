@@ -19,18 +19,22 @@ from .utils import (
 
 
 def _run_speaker_diarization(
-    audio_path: str, pipeline
+    audio_path: str, pipeline, num_speakers: int = 0
 ) -> List[Tuple[float, float, str]]:
+    print(f"当前设置的说话人数:{num_speakers}")
     from pyannote.audio.pipelines.utils.hook import ProgressHook
 
     with ProgressHook() as hook:
-        output = pipeline(audio_path, hook=hook, min_speakers=1, max_speakers=3)
+        if num_speakers > 0:
+            output = pipeline(audio_path, hook=hook, num_speakers=num_speakers)
+        else:
+            output = pipeline(audio_path, hook=hook, min_speakers=1, max_speakers=2)
 
     speaker_str = ""
     for turn, speaker in output.speaker_diarization:
-        print(f"start={turn.start:.1f}s stop={turn.end:.1f}s speaker_{speaker} ")
+        print(f"start={turn.start:.3f}s stop={turn.end:.3f}s speaker_{speaker} ")
         speaker_str += (
-            f"start={turn.start:.1f}s stop={turn.end:.1f}s speaker_{speaker} "
+            f"start={turn.start:.3f}s stop={turn.end:.3f}s speaker_{speaker} "
         )
 
     return parse_speaker_segments(speaker_str)
@@ -68,7 +72,9 @@ def _run_speaker_diarization_funasr(audio_path: str) -> List[Tuple[float, float,
     return sorted(segments, key=lambda x: x[0])
 
 
-def transcribe_audio(audio_path: str, use_diarization: bool = False) -> List[dict]:
+def transcribe_audio(
+    audio_path: str, use_diarization: bool = False, num_speakers: int = 0
+) -> List[dict]:
     if audio_path.endswith(".webm"):
         audio = AudioSegment.from_file(audio_path, format="webm")
         audio = audio.set_frame_rate(16000).set_channels(2)
@@ -100,7 +106,9 @@ def transcribe_audio(audio_path: str, use_diarization: bool = False) -> List[dic
         if settings.use_funasr_diarization:
             speaker_segments = _run_speaker_diarization_funasr(audio_path)
         else:
-            speaker_segments = _run_speaker_diarization(audio_path, pipeline)
+            speaker_segments = _run_speaker_diarization(
+                audio_path, pipeline, num_speakers
+            )
 
         if not speaker_segments:
             return [
@@ -149,7 +157,9 @@ def transcribe_audio(audio_path: str, use_diarization: bool = False) -> List[dic
         if settings.use_funasr_diarization:
             speaker_segments = _run_speaker_diarization_funasr(audio_path)
         else:
-            speaker_segments = _run_speaker_diarization(audio_path, pipeline)
+            speaker_segments = _run_speaker_diarization(
+                audio_path, pipeline, num_speakers
+            )
 
         items = results[0].time_stamps.items
 
@@ -160,7 +170,7 @@ def transcribe_audio(audio_path: str, use_diarization: bool = False) -> List[dic
 
 
 def transcribe_audio_bytes(
-    audio_bytes: bytes, use_diarization: bool = True
+    audio_bytes: bytes, use_diarization: bool = True, num_speakers: int = 0
 ) -> List[dict]:
     audio_bytesio = io.BytesIO(audio_bytes)
     audio_bytesio.seek(0)
@@ -187,7 +197,7 @@ def transcribe_audio_bytes(
             os.remove(temp_path)
             temp_path = new_path
 
-        return transcribe_audio(temp_path, use_diarization)
+        return transcribe_audio(temp_path, use_diarization, num_speakers)
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
@@ -199,10 +209,10 @@ def transcribe_audio_bytes(
 
 
 def transcribe_audio_base64(
-    audio_base64: str, use_diarization: bool = True
+    audio_base64: str, use_diarization: bool = True, num_speakers: int = 0
 ) -> List[dict]:
     audio_bytes = base64.b64decode(audio_base64)
-    return transcribe_audio_bytes(audio_bytes, use_diarization)
+    return transcribe_audio_bytes(audio_bytes, use_diarization, num_speakers)
 
 
 def get_last_speaker(segments: List[dict]) -> str:

@@ -1,5 +1,8 @@
 <template>
   <div class="app-container">
+    <div class="header-setting">
+      <SettingOutlined class="setting-icon" @click="showSettings = true" />
+    </div>
     <div class="main-content">
       <a-card class="function-card transcribe-card">
         <div class="transcribe-section">
@@ -63,6 +66,18 @@
     <div v-if="isRecognizing" class="recognizing-bar">
       识别中<span class="dots">...</span>
     </div>
+
+    <a-modal
+      v-model:open="showSettings"
+      title="设置"
+      :footer="null"
+      @ok="showSettings = false"
+    >
+      <div class="setting-item">
+        <span class="setting-label">说话人人数：</span>
+        <a-slider v-model:value="numSpeakerSetting" :min="1" :max="5" :marks="{1:'1',2:'2',3:'3',4:'4',5:'5'}" />
+      </div>
+    </a-modal>
   </div>
 </template>
 
@@ -74,7 +89,8 @@ import {
   StopOutlined,
   PauseOutlined,
   CaretRightOutlined,
-  LoadingOutlined
+  LoadingOutlined,
+  SettingOutlined
 } from '@ant-design/icons-vue'
 import MicButton from './components/MicButton.vue'
 import ResultList from './components/ResultList.vue'
@@ -96,6 +112,8 @@ const fullAudioSegments = ref([])
 const pendingTranscripts = ref([])
 const transcriptTimer = ref(null)
 const MAX_TRANSCRIPT_INTERVAL = 2000
+const showSettings = ref(false)
+const numSpeakerSetting = ref(2)
 
 const summary = ref({
   visible: false,
@@ -235,6 +253,7 @@ async function identifySpeaker(index) {
   try {
     const formData = new FormData()
     formData.append('file', fullRecordedBlob.value, 'audio.wav')
+    formData.append('num_speaker', numSpeakerSetting.value)
     
     const response = await fetch(`${getBaseUrl()}/transcribe`, {
       method: 'POST',
@@ -618,6 +637,36 @@ onUnmounted(() => {
   min-height: 100vh;
   background: #f0f2f5;
   padding: 20px;
+}
+
+.header-setting {
+  max-width: 600px;
+  margin: 0 auto 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.setting-icon {
+  font-size: 20px;
+  cursor: pointer;
+  color: #595959;
+  padding: 8px;
+  border-radius: 4px;
+  transition: all 0.3s;
+}
+
+.setting-icon:hover {
+  color: #1890ff;
+  background: #f0f0f0;
+}
+
+.setting-item {
+  padding: 8px 0;
+}
+
+.setting-label {
+  font-size: 14px;
+  color: #595959;
 }
 
 .main-content {
