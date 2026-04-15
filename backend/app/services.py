@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 import io
 import json
 import base64
@@ -16,20 +15,25 @@ from .utils import (
     parse_speaker_segments,
     merge_to_speaker_segments,
     fix_unknown_speaker,
+    fetch_hotwords_from_api,
 )
 
 
+GLOBAL_HOTWORDS: List[str] = []
+
+
+def init_hotwords():
+    global GLOBAL_HOTWORDS
+    GLOBAL_HOTWORDS = fetch_hotwords_from_api()
+    print(f"已加载 {len(GLOBAL_HOTWORDS)} 条热词")
+
+
 def _load_hotwords() -> List[str]:
-    hotwords_path = Path(__file__).parent.parent / "hotwords.txt"
-    if hotwords_path.exists():
-        with open(hotwords_path, "r", encoding="utf-8") as f:
-            return [line.strip() for line in f if line.strip()]
-    return []
+    return [hw.strip('"') for hw in GLOBAL_HOTWORDS]
 
 
 def _load_hotwords_for_qwen() -> str:
-    hotwords = _load_hotwords()
-    return " ".join(hotwords)
+    return " ".join(hw.strip('"') for hw in GLOBAL_HOTWORDS)
 
 
 def _run_speaker_diarization(

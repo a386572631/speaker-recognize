@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     use_funasr_diarization: Union[bool, str] = Field(
         default=False, alias="USE_FUNASR_DIARIZATION"
     )
+    wfw_base_url: str = Field(default="", alias="WFW_BASE_URL")
+    get_xm_hotwords: str = Field(default="", alias="GET_XM_HOTWORDS")
 
     @field_validator("use_funasr_diarization", mode="before")
     @classmethod

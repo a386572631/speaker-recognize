@@ -6,11 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .models import get_asr_model
+from .services import init_hotwords
 from .routes import websocket, openai_transcription, transcribe, speech
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_hotwords()
     settings = get_settings()
     print(f"初始化模型: {settings.model_name}, 设备: {settings.device}")
     asr = get_asr_model()

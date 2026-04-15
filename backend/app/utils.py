@@ -1,4 +1,5 @@
 import re
+import requests
 from typing import List, Tuple, Any
 
 from pyannote.audio import Pipeline
@@ -125,3 +126,29 @@ def fix_unknown_speaker(segments: List[dict]) -> List[dict]:
         if "UNKNOWN" in str(item.get("speaker", "")):
             item["speaker"] = "SPEAKER_1"
     return segments
+
+
+def fetch_hotwords_from_api() -> List[str]:
+    from .config import get_settings
+
+    settings = get_settings()
+    if not settings.wfw_base_url or not settings.get_xm_hotwords:
+        return []
+
+    url = settings.wfw_base_url + settings.get_xm_hotwords
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        result = response.json()
+        if result.get("hasError", 0) != 0:
+            print(f"获取热词失败: {result.get('errorMessage', '未知错误')}")
+            return []
+
+        data = result.get("data", [])
+        if not data:
+            return []
+
+        return [str(item) for item in data]
+    except Exception as e:
+        print(f"获取热词失败: {e}")
+        return []
