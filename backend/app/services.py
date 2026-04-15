@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import io
 import json
 import base64
@@ -16,6 +17,19 @@ from .utils import (
     merge_to_speaker_segments,
     fix_unknown_speaker,
 )
+
+
+def _load_hotwords() -> List[str]:
+    hotwords_path = Path(__file__).parent.parent / "hotwords.txt"
+    if hotwords_path.exists():
+        with open(hotwords_path, "r", encoding="utf-8") as f:
+            return [line.strip() for line in f if line.strip()]
+    return []
+
+
+def _load_hotwords_for_qwen() -> str:
+    hotwords = _load_hotwords()
+    return " ".join(hotwords)
 
 
 def _run_speaker_diarization(
@@ -89,7 +103,10 @@ def transcribe_audio(
 
     if settings.model_name == "Fun-ASR-Nano-2512":
         funasr_nano = asr.funasr_nano_model
-        funasr_nano_kwargs = asr.funasr_nano_kwargs
+        funasr_nano_kwargs = asr.funasr_nano_kwargs.copy()
+        hotwords = _load_hotwords()
+        if hotwords:
+            funasr_nano_kwargs["hotwords"] = hotwords
         results = funasr_nano.inference(data_in=[audio_path], **funasr_nano_kwargs)
         text = results[0][0].get("text", "")
         print(f"results:{results}")
@@ -140,8 +157,12 @@ def transcribe_audio(
         return speaker_segments_result
     else:
         model = asr.qwen_model
+        hotwords = _load_hotwords_for_qwen()
         results = model.transcribe(
-            audio=audio_path, language="Chinese", return_time_stamps=True
+            audio=audio_path,
+            language="Chinese",
+            return_time_stamps=True,
+            context=hotwords,
         )
 
         if not use_diarization:
