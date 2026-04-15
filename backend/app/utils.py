@@ -48,17 +48,17 @@ def merge_to_speaker_segments(
     align_items: List[Any], speaker_segments: List[Tuple[float, float, str]]
 ) -> List[dict]:
     print(f"speaker_segments:{speaker_segments}")
-    print(f"align_items count: {len(align_items)}")
+    print(f"align_items count: {align_items}")
     if not align_items or not speaker_segments:
         return []
 
-    speaker_labels = {}
-    speaker_counter = 1
+    unique_speakers = sorted(set(speaker[2] for speaker in speaker_segments))
+    speaker_labels = {
+        speaker: f"SPEAKER_{str(i + 1).zfill(2)}"
+        for i, speaker in enumerate(unique_speakers)
+    }
+
     sorted_segments = sorted(speaker_segments, key=lambda x: x[0])
-    for _, _, speaker in sorted_segments:
-        if speaker not in speaker_labels:
-            speaker_labels[speaker] = f"SPEAKER_{speaker_counter}"
-            speaker_counter += 1
 
     result_segments = []
     current_speaker = None
@@ -66,59 +66,48 @@ def merge_to_speaker_segments(
     current_start_time = None
     current_end_time = None
 
-    seg_idx = 0
     for item in align_items:
-        char_mid = (item.start_time + item.end_time) / 2
-        while seg_idx < len(sorted_segments):
-            start, stop, speaker = sorted_segments[seg_idx]
-            if char_mid >= start and char_mid <= stop + 0.1:
-                break
-            seg_idx += 1
+        char_start = item.start_time
+        char_end = item.end_time
+        target_speaker = None
 
-        if seg_idx < len(sorted_segments):
-            target_speaker = speaker
-        else:
-            target_speaker = current_speaker
+        for start, stop, speaker in sorted_segments:
+            if char_start >= start and char_end <= stop:
+                target_speaker = speaker
+                break
+
+        if target_speaker is None:
+            continue
 
         if target_speaker != current_speaker:
             if current_text:
                 result_segments.append(
                     {
                         "text": "".join(current_text),
-                        "speaker": speaker_labels.get(
-                            current_speaker, "SPEAKER_UNKNOWN"
-                        ),
+                        "speaker": speaker_labels.get(current_speaker, "SPEAKER_01"),
                         "start_time": current_start_time,
                         "end_time": current_end_time,
                     }
                 )
             current_speaker = target_speaker
             current_text = [item.text]
-            current_start_time = item.start_time
-            current_end_time = item.end_time
+            current_start_time = char_start
+            current_end_time = char_end
         else:
             current_text.append(item.text)
-            current_end_time = item.end_time
+            current_end_time = char_end
 
     if current_text:
         result_segments.append(
             {
                 "text": "".join(current_text),
-                "speaker": speaker_labels.get(current_speaker, "SPEAKER_UNKNOWN"),
+                "speaker": speaker_labels.get(current_speaker, "SPEAKER_01"),
                 "start_time": current_start_time,
                 "end_time": current_end_time,
             }
         )
 
-    merged_result = []
-    for segment in result_segments:
-        if merged_result and merged_result[-1]["speaker"] == segment["speaker"]:
-            merged_result[-1]["text"] += segment["text"]
-            merged_result[-1]["end_time"] = segment["end_time"]
-        else:
-            merged_result.append(segment)
-
-    return merged_result
+    return result_segments
 
 
 def fix_unknown_speaker(segments: List[dict]) -> List[dict]:
