@@ -68,6 +68,12 @@ class ASRModel:
         )
         self._pipeline.to(settings.device)
 
+        # replace the segmentation model with your fine-tuned one
+        from diarizers import SegmentationModel
+        model = SegmentationModel().from_pretrained(settings.pyannote_segmentation_model_path)
+        model = model.to_pyannote_model()
+        self._pipeline._segmentation.model = model.to(settings.device)
+
         print(f"模型加载成功: {settings.model_name}, 设备: {settings.device}")
 
     @property

@@ -55,6 +55,10 @@ class Settings(BaseSettings):
         return BASE_DIR / "models" / "pyannote" / "speaker-diarization-community-1"
 
     @property
+    def pyannote_segmentation_model_path(self) -> Path:
+        return BASE_DIR / "models" / "pyannote" / "pyannote-segmentation-zho-001"
+
+    @property
     def vad_model_path(self) -> Path:
         return BASE_DIR / "models" / "speech_fsmn_vad_zh-cn-16k-common-pytorch"
 
