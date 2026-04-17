@@ -5,6 +5,7 @@ import base64
 import tempfile
 import uuid
 from typing import List, Optional, Tuple
+from typing import Union
 
 import numpy as np
 from pydub import AudioSegment
@@ -16,6 +17,7 @@ from .utils import (
     merge_to_speaker_segments,
     fix_unknown_speaker,
     fetch_hotwords_from_api,
+    compute_segment_similarity,
 )
 
 
@@ -38,7 +40,7 @@ def _load_hotwords_for_qwen() -> str:
 
 def _run_speaker_diarization(
     audio_path: str, pipeline, num_speakers: int = 0
-) -> List[Tuple[float, float, str]]:
+) -> Tuple[List[Tuple[float, float, str]], List[dict]]:
     print(f"当前设置的说话人数:{num_speakers}")
     from pyannote.audio.pipelines.utils.hook import ProgressHook
 
@@ -50,15 +52,22 @@ def _run_speaker_diarization(
 
     speaker_str = ""
     for turn, speaker in output.speaker_diarization:
-        print(f"start={turn.start:.3f}s stop={turn.end:.3f}s speaker_{speaker} ")
         speaker_str += (
             f"start={turn.start:.3f}s stop={turn.end:.3f}s speaker_{speaker} "
         )
 
-    return parse_speaker_segments(speaker_str)
+    segments = parse_speaker_segments(speaker_str)
+
+    asr = get_asr_model()
+    wespeaker_model = asr.wespeaker_model
+    similarity_info = compute_segment_similarity(audio_path, segments, wespeaker_model)
+
+    return segments, similarity_info
 
 
-def _run_speaker_diarization_funasr(audio_path: str) -> List[Tuple[float, float, str]]:
+def _run_speaker_diarization_funasr(
+    audio_path: str,
+) -> Tuple[List[Tuple[float, float, str]], List[dict]]:
     asr = get_asr_model()
     funasr_model = asr.funasr_spk_model
 
@@ -67,7 +76,7 @@ def _run_speaker_diarization_funasr(audio_path: str) -> List[Tuple[float, float,
     )
 
     if not results or not results[0].get("sentence_info"):
-        return []
+        return [], []
 
     segments = []
     speaker_counter = 1
@@ -87,7 +96,12 @@ def _run_speaker_diarization_funasr(audio_path: str) -> List[Tuple[float, float,
             )
         )
     print(f"segments:{segments}")
-    return sorted(segments, key=lambda x: x[0])
+    segments = sorted(segments, key=lambda x: x[0])
+
+    wespeaker_model = asr.wespeaker_model
+    similarity_info = compute_segment_similarity(audio_path, segments, wespeaker_model)
+
+    return segments, similarity_info
 
 
 def transcribe_audio(
@@ -121,13 +135,16 @@ def transcribe_audio(
                     "speaker": "SPEAKER_1",
                     "start_time": 0.0,
                     "end_time": 0.0,
+                    "similarity": None,
                 }
             ]
 
         if settings.use_funasr_diarization:
-            speaker_segments = _run_speaker_diarization_funasr(audio_path)
+            speaker_segments, similarity_info = _run_speaker_diarization_funasr(
+                audio_path
+            )
         else:
-            speaker_segments = _run_speaker_diarization(
+            speaker_segments, similarity_info = _run_speaker_diarization(
                 audio_path, pipeline, num_speakers
             )
 
@@ -138,6 +155,7 @@ def transcribe_audio(
                     "speaker": "SPEAKER_1",
                     "start_time": 0.0,
                     "end_time": 0.0,
+                    "similarity": None,
                 }
             ]
 
@@ -156,7 +174,9 @@ def transcribe_audio(
                 )
             )
 
-        speaker_segments_result = merge_to_speaker_segments(items, speaker_segments)
+        speaker_segments_result = merge_to_speaker_segments(
+            items, speaker_segments, similarity_info
+        )
         speaker_segments_result = fix_unknown_speaker(speaker_segments_result)
         return speaker_segments_result
     else:
@@ -176,19 +196,25 @@ def transcribe_audio(
                     "speaker": "SPEAKER_1",
                     "start_time": 0.0,
                     "end_time": 0.0,
+                    "similarity": None,
                 }
             ]
 
         if settings.use_funasr_diarization:
-            speaker_segments = _run_speaker_diarization_funasr(audio_path)
+            speaker_segments, similarity_info = _run_speaker_diarization_funasr(
+                audio_path
+            )
         else:
-            speaker_segments = _run_speaker_diarization(
+            speaker_segments, similarity_info = _run_speaker_diarization(
                 audio_path, pipeline, num_speakers
             )
 
+        text = results[0].text
         items = results[0].time_stamps.items
 
-        speaker_segments_result = merge_to_speaker_segments(items, speaker_segments)
+        speaker_segments_result = merge_to_speaker_segments(
+            items, speaker_segments, similarity_info
+        )
         speaker_segments_result = fix_unknown_speaker(speaker_segments_result)
 
         return speaker_segments_result

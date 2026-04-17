@@ -47,7 +47,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_json({"status": "Processing audio..."})
 
                 try:
-                    segments = transcribe_audio_base64(audio_base64)
+                    segments = transcribe_audio_base64(
+                        audio_base64, use_diarization=False
+                    )
                     await websocket.send_json({"result": segments})
 
                 except Exception as e:

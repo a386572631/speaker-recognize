@@ -3,6 +3,7 @@ import torch
 from pathlib import Path
 from typing import Optional, Any
 
+import wespeaker
 from qwen_asr import Qwen3ASRModel
 from pyannote.audio import Pipeline
 from funasr import AutoModel
@@ -27,6 +28,7 @@ class ASRModel:
     _funasr_nano_kwargs: Optional[dict] = None
     _funasr_spk_model: Optional[AutoModel] = None
     _pipeline: Optional[Pipeline] = None
+    _wespeaker_model: Optional[Any] = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -70,7 +72,10 @@ class ASRModel:
 
         # replace the segmentation model with your fine-tuned one
         from diarizers import SegmentationModel
-        model = SegmentationModel().from_pretrained(settings.pyannote_segmentation_model_path)
+
+        model = SegmentationModel().from_pretrained(
+            settings.pyannote_segmentation_model_path
+        )
         model = model.to_pyannote_model()
         self._pipeline._segmentation.model = model.to(settings.device)
 
@@ -132,9 +137,15 @@ class ASRModel:
                 punc_model="ct-punc",
                 spk_model="cam++",
                 device=device_str,
-                trust_remote_code=True
+                trust_remote_code=True,
             )
         return self._funasr_spk_model
+
+    @property
+    def wespeaker_model(self) -> Optional[Any]:
+        if self._wespeaker_model is None:
+            self._wespeaker_model = wespeaker.load_model("chinese")
+        return self._wespeaker_model
 
 
 asr_model = ASRModel()

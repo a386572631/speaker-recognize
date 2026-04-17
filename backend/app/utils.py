@@ -1,6 +1,10 @@
 import re
+import os
+import tempfile
+import uuid
 import requests
 from typing import List, Tuple, Any
+from pydub import AudioSegment
 
 from pyannote.audio import Pipeline
 from pyannote.audio.pipelines.utils.hook import ProgressHook
@@ -45,65 +49,44 @@ def parse_speaker_segments(speaker_str: str) -> List[Tuple[float, float, str]]:
 
 
 def merge_to_speaker_segments(
-    align_items: List[Any], speaker_segments: List[Tuple[float, float, str]]
+    align_items: List[Any],
+    speaker_segments: List[Tuple[float, float, str]],
+    similarity_info: List[dict] = None,
 ) -> List[dict]:
-    print(f"speaker_segments:{speaker_segments}")
-    print(f"align_items count: {align_items}")
-    if not align_items or not speaker_segments:
+    if not speaker_segments:
         return []
-
-    unique_speakers = sorted(set(speaker[2] for speaker in speaker_segments))
-    speaker_labels = {
-        speaker: f"SPEAKER_{str(i + 1).zfill(2)}"
-        for i, speaker in enumerate(unique_speakers)
-    }
 
     sorted_segments = sorted(speaker_segments, key=lambda x: x[0])
 
     result_segments = []
-    current_speaker = None
-    current_text = []
-    current_start_time = None
-    current_end_time = None
+    speaker_counter = 1
 
-    for item in align_items:
-        char_start = item.start_time
-        char_end = item.end_time
-        target_speaker = None
+    for idx, (start, stop, speaker) in enumerate(sorted_segments):
+        segment_texts = []
 
-        for start, stop, speaker in sorted_segments:
-            if char_start >= start and char_end <= stop:
-                target_speaker = speaker
-                break
+        if align_items:
+            for item in align_items:
+                char_start = item.start_time
+                char_end = item.end_time
 
-        if target_speaker is None:
-            continue
+                if char_start >= start and char_end <= stop:
+                    segment_texts.append(item.text)
 
-        if target_speaker != current_speaker:
-            if current_text:
-                result_segments.append(
-                    {
-                        "text": "".join(current_text),
-                        "speaker": speaker_labels.get(current_speaker, "SPEAKER_01"),
-                        "start_time": current_start_time,
-                        "end_time": current_end_time,
-                    }
-                )
-            current_speaker = target_speaker
-            current_text = [item.text]
-            current_start_time = char_start
-            current_end_time = char_end
-        else:
-            current_text.append(item.text)
-            current_end_time = char_end
+        similarity = None
+        if similarity_info and idx < len(similarity_info):
+            similarity = similarity_info[idx].get("similarity")
 
-    if current_text:
+        if similarity is not None and similarity < 0.7:
+            speaker_counter += 1
+
+        text = "".join(segment_texts) if segment_texts else ""
         result_segments.append(
             {
-                "text": "".join(current_text),
-                "speaker": speaker_labels.get(current_speaker, "SPEAKER_01"),
-                "start_time": current_start_time,
-                "end_time": current_end_time,
+                "text": text,
+                "speaker": f"SPEAKER_{str(speaker_counter).zfill(2)}",
+                "start_time": round(start, 2),
+                "end_time": round(stop, 2),
+                "similarity": similarity,
             }
         )
 
@@ -141,3 +124,72 @@ def fetch_hotwords_from_api() -> List[str]:
     except Exception as e:
         print(f"获取热词失败: {e}")
         return []
+
+
+def compute_segment_similarity(
+    audio_path: str,
+    speaker_segments: List[Tuple[float, float, str]],
+    wespeaker_model,
+) -> List[dict]:
+    print(f"compute_segment_similarity 输入: {speaker_segments}")
+    print(">>> 开始处理 <<<")
+    print(f"len: {len(speaker_segments)}, < 2? {len(speaker_segments) < 2}")
+    if not speaker_segments or len(speaker_segments) < 2:
+        print("speaker_segments为空或少于2个，返回空")
+        return []
+
+    segments_with_similarity = []
+    temp_dir = tempfile.mkdtemp()
+
+    try:
+        for i, (start, end, speaker) in enumerate(speaker_segments):
+            print(f"处理segment {i}: start={start}, end={end}, speaker={speaker}")
+            audio = AudioSegment.from_file(audio_path)
+            segment_audio = audio[int(start * 1000) : int(end * 1000)]
+            segment_path = os.path.join(temp_dir, f"segment_{i}_{uuid.uuid4()}.wav")
+            segment_audio.export(segment_path, format="wav")
+
+            segments_with_similarity.append(
+                {
+                    "start": start,
+                    "end": end,
+                    "speaker": speaker,
+                    "path": segment_path,
+                    "similarity": None,
+                }
+            )
+
+        print(">>> 计算similarity <<<")
+        for i in range(1, len(segments_with_similarity)):
+            prev_seg = segments_with_similarity[i - 1]
+            curr_seg = segments_with_similarity[i]
+
+            print(
+                f"i={i}, prev_speaker={prev_seg['speaker']}, curr_speaker={curr_seg['speaker']}"
+            )
+            similarity = wespeaker_model.compute_similarity(
+                prev_seg["path"], curr_seg["path"]
+            )
+            print(f"similarity result: {similarity}")
+            curr_seg["similarity"] = float(similarity)
+    finally:
+        for seg in segments_with_similarity:
+            if os.path.exists(seg["path"]):
+                try:
+                    os.remove(seg["path"])
+                except:
+                    pass
+        try:
+            os.rmdir(temp_dir)
+        except:
+            pass
+
+    return [
+        {
+            "start": seg["start"],
+            "end": seg["end"],
+            "speaker": seg["speaker"],
+            "similarity": seg["similarity"],
+        }
+        for seg in segments_with_similarity
+    ]
