@@ -1,7 +1,8 @@
 import logging
 import os
+import requests
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from funasr import AutoModel
 from app.core.config import settings
 
@@ -13,6 +14,32 @@ class ASRService:
         self._fun_asr_model: Optional[AutoModel] = None
         self._qwen_asr_model: Optional[object] = None
         self._model_loaded = False
+        self._hotwords: List[str] = []
+        self._load_hotwords()
+
+    def _load_hotwords(self):
+        if not settings.hotword_api_url:
+            logger.info("未配置热词接口，跳过热词加载")
+            return
+
+        try:
+            response = requests.get(settings.hotword_api_url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get("hasError") == -1:
+                logger.warning(f"热词接口返回错误: {data.get('errorMessage')}")
+                return
+
+            words = data.get("data", []) or []
+            self._hotwords = [w.strip() for w in words if w.strip()]
+            logger.info(f"成功加载 {len(self._hotwords)} 个热词: {self._hotwords[:10]}...")
+        except Exception as e:
+            logger.warning(f"加载热词失败: {e}")
+            self._hotwords = []
+
+    def get_hotwords_text(self) -> str:
+        return " ".join(self._hotwords)
 
     def _get_model_path(self, model_name: str) -> str:
         local_path = settings.models_dir / "Fun-ASR-Nano-2512"
@@ -90,15 +117,18 @@ class ASRService:
         return self._qwen_asr_model
 
     def transcribe_fun_asr(self, audio_data, language: Optional[str] = None):
+        hotword = self.get_hotwords_text()
         result = self.fun_asr.generate(
             input=[audio_data],
             language=language if language else "auto",
             itn=True,
+            hotword=hotword if hotword else "",
         )
         return result[0]["text"] if result else ""
 
     def transcribe_qwen_asr(self, audio_data):
-        result = self.qwen_asr.transcribe(audio_data)
+        hotwords = self._hotwords
+        result = self.qwen_asr.transcribe(audio_data, hotwords=hotwords)
         return result[0].text if result else ""
 
 

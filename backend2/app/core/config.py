@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     tts_model: str = "edge-tts"
     tts_voice: str = "zh-CN-XiaoxiaoNeural"
 
+    hotword_api_url: str = ""
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if not self.device:
