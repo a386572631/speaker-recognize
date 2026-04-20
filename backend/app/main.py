@@ -1,4 +1,3 @@
-import torch
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -45,11 +44,19 @@ app.include_router(transcribe.router, prefix="/transcribe", tags=["transcribe"])
 
 @app.get("/health")
 async def health_check():
+    from fastapi.responses import JSONResponse
+
     settings = get_settings()
     asr = get_asr_model()
-    if asr.model is None:
-        from fastapi.responses import JSONResponse
+    settings = get_settings()
 
+    is_loaded = False
+    if settings.model_name == "Fun-ASR-Nano-2512":
+        is_loaded = asr.funasr_nano_model is not None
+    elif settings.model_name.startswith("Qwen"):
+        is_loaded = asr.qwen_model is not None
+
+    if not is_loaded:
         return JSONResponse(
             status_code=503,
             content={"status": "unhealthy", "message": "Model not loaded"},

@@ -1,27 +1,15 @@
-import asyncio
 import os
 import tempfile
-from typing import Optional
 
-import torch
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from fastapi.responses import Response
 
 import soundfile as sf
 
+from ..auth import verify_auth
 from ..config import get_settings
 
 router = APIRouter()
-settings = get_settings()
-
-
-async def verify_auth(authorization: str = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    token = authorization.split(" ")[1]
-    if token != settings.api_key:
-        raise HTTPException(status_code=401, detail="Api Key Error")
-    return token
 
 
 @router.post("/speech")
@@ -45,6 +33,7 @@ async def create_speech(
         raise HTTPException(status_code=400, detail="Missing 'input' field")
 
     text = body["input"]
+    settings = get_settings()
     speaker = body.get("voice") or voice or settings.tts_voice
 
     if tts.tts_type == "qwen":

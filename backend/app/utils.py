@@ -59,7 +59,7 @@ def merge_to_speaker_segments(
     sorted_segments = sorted(speaker_segments, key=lambda x: x[0])
 
     result_segments = []
-    speaker_counter = 1
+    current_speaker = 1
 
     for idx, (start, stop, speaker) in enumerate(sorted_segments):
         segment_texts = []
@@ -76,14 +76,23 @@ def merge_to_speaker_segments(
         if similarity_info and idx < len(similarity_info):
             similarity = similarity_info[idx].get("similarity")
 
-        if similarity is not None and similarity < 0.7:
-            speaker_counter += 1
+        if result_segments:
+            prev = result_segments[-1]
+            should_merge = similarity is not None and similarity >= 0.7
+
+            if should_merge:
+                prev["end_time"] = round(stop, 2)
+                if segment_texts:
+                    prev["text"] = prev.get("text", "") + "".join(segment_texts)
+                continue
+
+            current_speaker += 1
 
         text = "".join(segment_texts) if segment_texts else ""
         result_segments.append(
             {
                 "text": text,
-                "speaker": f"SPEAKER_{str(speaker_counter).zfill(2)}",
+                "speaker": f"SPEAKER_{str(current_speaker).zfill(2)}",
                 "start_time": round(start, 2),
                 "end_time": round(stop, 2),
                 "similarity": similarity,
@@ -130,26 +139,22 @@ def compute_segment_similarity(
     audio_path: str,
     speaker_segments: List[Tuple[float, float, str]],
     wespeaker_model,
+    merge_threshold: float = 0.7,
 ) -> List[dict]:
-    print(f"compute_segment_similarity 输入: {speaker_segments}")
-    print(">>> 开始处理 <<<")
-    print(f"len: {len(speaker_segments)}, < 2? {len(speaker_segments) < 2}")
     if not speaker_segments or len(speaker_segments) < 2:
-        print("speaker_segments为空或少于2个，返回空")
         return []
 
-    segments_with_similarity = []
+    segments_with_path = []
     temp_dir = tempfile.mkdtemp()
 
     try:
         for i, (start, end, speaker) in enumerate(speaker_segments):
-            print(f"处理segment {i}: start={start}, end={end}, speaker={speaker}")
             audio = AudioSegment.from_file(audio_path)
             segment_audio = audio[int(start * 1000) : int(end * 1000)]
             segment_path = os.path.join(temp_dir, f"segment_{i}_{uuid.uuid4()}.wav")
             segment_audio.export(segment_path, format="wav")
 
-            segments_with_similarity.append(
+            segments_with_path.append(
                 {
                     "start": start,
                     "end": end,
@@ -159,22 +164,21 @@ def compute_segment_similarity(
                 }
             )
 
-        print(">>> 计算similarity <<<")
-        for i in range(1, len(segments_with_similarity)):
-            prev_seg = segments_with_similarity[i - 1]
-            curr_seg = segments_with_similarity[i]
+        for i in range(1, len(segments_with_path)):
+            prev_seg = segments_with_path[i - 1]
+            curr_seg = segments_with_path[i]
 
-            print(
-                f"i={i}, prev_speaker={prev_seg['speaker']}, curr_speaker={curr_seg['speaker']}"
-            )
-            similarity = wespeaker_model.compute_similarity(
-                prev_seg["path"], curr_seg["path"]
-            )
-            print(f"similarity result: {similarity}")
-            curr_seg["similarity"] = float(similarity)
+            try:
+                similarity = wespeaker_model.compute_similarity(
+                    prev_seg["path"], curr_seg["path"]
+                )
+                curr_seg["similarity"] = float(similarity)
+            except Exception as e:
+                print(f"计算相似度失败: {e}")
+
     finally:
-        for seg in segments_with_similarity:
-            if os.path.exists(seg["path"]):
+        for seg in segments_with_path:
+            if os.path.exists(seg.get("path", "")):
                 try:
                     os.remove(seg["path"])
                 except:
@@ -184,12 +188,31 @@ def compute_segment_similarity(
         except:
             pass
 
-    return [
-        {
-            "start": seg["start"],
-            "end": seg["end"],
-            "speaker": seg["speaker"],
-            "similarity": seg["similarity"],
-        }
-        for seg in segments_with_similarity
-    ]
+    results = []
+    current_speaker_id = "SPEAKER_01"
+    expected_speaker = 1
+
+    for i, seg in enumerate(segments_with_path):
+        similarity = seg.get("similarity")
+
+        if results:
+            prev = results[-1]
+            should_merge = similarity is not None and similarity >= merge_threshold
+
+            if should_merge:
+                prev["end"] = seg["end"]
+                continue
+
+            expected_speaker += 1
+
+        current_speaker_id = f"SPEAKER_{str(expected_speaker).zfill(2)}"
+        results.append(
+            {
+                "start": seg["start"],
+                "end": seg["end"],
+                "speaker": current_speaker_id,
+                "similarity": similarity,
+            }
+        )
+
+    return results
