@@ -8,7 +8,7 @@ wheels/
 
 # Virtual environments
 backend/.venv
-
+backend2/.venv
 
 .omc
 nul
@@ -22,6 +22,8 @@ large_tool_results/
 .env
 backend/models/**
 backend/uv.lock
+backend2/models/**
+backend2/uv.lock
 speaker-verify.md
 **/.ruff_cache
 .DS_Store
