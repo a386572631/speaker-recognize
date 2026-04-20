@@ -45,6 +45,15 @@ def parse_speaker_segments(speaker_str: str) -> List[Tuple[float, float, str]]:
             current = next_seg
 
     split_segments.append(current)
+
+    if split_segments:
+        first_start = split_segments[0][0]
+        if first_start > 0:
+            split_segments = [
+                (0.0, seg[1], seg[2]) if i == 0 else seg
+                for i, seg in enumerate(split_segments)
+            ]
+
     return split_segments
 
 

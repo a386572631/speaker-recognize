@@ -37,9 +37,10 @@ async def handle_json(request: Request):
     try:
         segments = transcribe_audio_base64(audio_base64, use_diarization, num_speaker)
         last_speaker = get_last_speaker(segments)
+        text = " ".join([s["text"] for s in segments])
 
         return JSONResponse(
-            content={"segments": segments, "last_speaker": last_speaker}
+            content={"segments": segments, "last_speaker": last_speaker, "text": text}
         )
     except Exception as e:
         import traceback
@@ -77,9 +78,10 @@ async def handle_multipart(request: Request):
 
         segments = transcribe_audio(temp_path, use_diarization, num_speaker)
         last_speaker = get_last_speaker(segments)
+        text = " ".join([s["text"] for s in segments])
 
         return JSONResponse(
-            content={"segments": segments, "last_speaker": last_speaker}
+            content={"segments": segments, "last_speaker": last_speaker, "text": text}
         )
 
     finally:
