@@ -11,13 +11,13 @@ class Settings(BaseSettings):
     models_dir: Path = project_root / "models"
     pyannote_model_path: Path = models_dir / "pyannote" / "speaker-diarization-community-1"
     pyannote_segmentation_model_path: Path = models_dir / "pyannote" / "pyannote-segmentation-zho-001"
+    wespeaker_model_path: Path = models_dir / "wespeaker"
 
     model: str = "fun-asr-nano-2512"
     fun_asr_model: str = "./models/Fun-ASR-Nano-2512"
     qwen_asr_model: str = "./models/Qwen/Qwen3-ASR-1.7B"
     forced_aligner_path: str = "./models/Qwen/Qwen3-ForcedAligner-0.6B"
     device: str = ""
-    hf_token: str = ""
     pyannote_token: str = ""
     openai_api_key: str = ""
 
@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     tts_voice: str = "zh-CN-XiaoxiaoNeural"
 
     hotword_api_url: str = ""
+    wespeaker_enabled: bool = False
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

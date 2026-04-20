@@ -7,9 +7,11 @@ from app.core.auth import verify_api_key
 from app.core.config import settings
 from app.services.asr_service import asr_service
 from app.services.diarization_service import diarization_service
+from app.services.speaker_verify_service import speaker_verify_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
 
 class TranscriptionResult(BaseModel):
     text: str
@@ -104,7 +106,6 @@ async def transcribe_audio(
                     audio=[tmp_path],
                     language="Chinese",
                     return_time_stamps=True,
-                    # context=hotwords,
                 )
                 full_text = asr_result[0].text
                 timestamps = asr_result[0].time_stamps.items
@@ -120,6 +121,15 @@ async def transcribe_audio(
             logger.info("每个字的timestamp：" + str(timestamps))
             speaker_segments = diarization_service.diarize(tmp_path, num_speakers)
             logger.info("说话人聚类结果：" + str(speaker_segments))
+            
+            if settings.wespeaker_enabled and speaker_verify_service._model:
+                speaker_segments = speaker_verify_service.verify_and_merge(
+                    tmp_path,
+                    speaker_segments,
+                    similarity_threshold=0.7
+                )
+                logger.info("wespeaker聚类结果：" + str(speaker_segments))
+
             merged_segments = merge_asr_and_speaker(timestamps, speaker_segments)
 
             return TranscriptionResult(
