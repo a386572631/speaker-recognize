@@ -1,7 +1,6 @@
 import io
 import tempfile
 import os
-import asyncio
 import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.services.asr_service import asr_service
@@ -10,73 +9,73 @@ from app.core.config import settings
 router = APIRouter()
 
 
-@router.websocket("/transcribe")
-async def websocket_transcribe(websocket: WebSocket):
-    model = settings.model
+@router.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
 
     try:
-        config_msg = await asyncio.wait_for(websocket.receive_text(), timeout=5.0)
-        config = json.loads(config_msg)
-        if config.get("model"):
-            model = config["model"]
-            await websocket.send_json({"type": "config", "model": model, "status": "ok"})
-    except:
-        await websocket.send_json({"type": "config", "model": model, "status": "ok"})
-
-    buffer = b""
-
-    try:
+        auth_received = False
         while True:
+            data = await websocket.receive_text()
+
+            if not auth_received:
+                if data.startswith("Authorization:"):
+                    token = data.split(":", 1)[1].strip()
+                    if token != f"Bearer {settings.openai_api_key}":
+                        await websocket.send_json({"error": "Api Key Error"})
+                        await websocket.close()
+                        return
+                    auth_received = True
+                    await websocket.send_json({"status": "connected"})
+                continue
+
             try:
-                data = await asyncio.wait_for(websocket.receive_bytes(), timeout=10.0)
-            except asyncio.TimeoutError:
-                if buffer:
+                message = json.loads(data)
+            except json.JSONDecodeError:
+                await websocket.send_json({"error": "Invalid JSON"})
+                continue
+
+            if message.get("type") == "transcribe":
+                audio_base64 = message.get("audio", "")
+                if not audio_base64:
+                    await websocket.send_json({"error": "No audio data"})
+                    continue
+
+                await websocket.send_json({"status": "Processing audio..."})
+
+                try:
+                    import base64
+                    audio_bytes = base64.b64decode(audio_base64)
+
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-                        tmp.write(buffer)
+                        tmp.write(audio_bytes)
                         tmp_path = tmp.name
 
                     try:
-                        if "fun-asr" in model.lower():
+                        if "fun-asr" in settings.model.lower():
                             text = asr_service.transcribe_fun_asr(tmp_path)
-                        elif "qwen" in model.lower():
+                        elif "qwen" in settings.model.lower():
                             text = asr_service.transcribe_qwen_asr(tmp_path)
                         else:
                             text = asr_service.transcribe_fun_asr(tmp_path)
                     finally:
                         os.unlink(tmp_path)
 
-                    await websocket.send_json({
-                        "type": "transcription",
-                        "text": text,
-                        "status": "completed"
-                    })
-                    buffer = b""
-                continue
+                    await websocket.send_json({"result": text})
 
-            buffer += data
+                except Exception as e:
+                    import traceback
+                    traceback.print_exc()
+                    await websocket.send_json({"error": f"Transcription failed: {str(e)}"})
 
-            if len(buffer) > 1024 * 1024:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-                    tmp.write(buffer)
-                    tmp_path = tmp.name
-
-                try:
-                    if "fun-asr" in model.lower():
-                        text = asr_service.transcribe_fun_asr(tmp_path)
-                    elif "qwen" in model.lower():
-                        text = asr_service.transcribe_qwen_asr(tmp_path)
-                    else:
-                        text = asr_service.transcribe_fun_asr(tmp_path)
-                finally:
-                    os.unlink(tmp_path)
-
-                await websocket.send_json({
-                    "type": "transcription",
-                    "text": text,
-                    "status": "completed"
-                })
-                buffer = b""
+            elif message.get("type") == "ping":
+                await websocket.send_json({"status": "pong"})
 
     except WebSocketDisconnect:
-        pass
+        print("Client disconnected")
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+        try:
+            await websocket.close()
+        except:
+            pass
