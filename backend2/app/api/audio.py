@@ -22,7 +22,7 @@ class SpeechRequest(BaseModel):
     voice: str = ""
 
 
-@router.post("/transcription", response_model=TranscriptionResponse)
+@router.post("/transcriptions", response_model=TranscriptionResponse)
 async def create_transcription(
     file: UploadFile = File(...),
     language: str = Form("auto"),
