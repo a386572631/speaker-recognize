@@ -117,18 +117,18 @@ class ASRService:
         return self._qwen_asr_model
 
     def transcribe_fun_asr(self, audio_data, language: Optional[str] = None):
-        hotword = self.get_hotwords_text()
+        hotword = self._hotwords
         result = self.fun_asr.generate(
             input=[audio_data],
             language=language if language else "auto",
             itn=True,
-            hotword=hotword if hotword else "",
+            hotwords=hotword,
         )
         return result[0]["text"] if result else ""
 
     def transcribe_qwen_asr(self, audio_data):
-        hotwords = self._hotwords
-        result = self.qwen_asr.transcribe(audio_data, hotwords=hotwords)
+        hotwords = self.get_hotwords_text()
+        result = self.qwen_asr.transcribe(audio_data, context=hotwords)
         return result[0].text if result else ""
 
 
