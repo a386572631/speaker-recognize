@@ -74,23 +74,47 @@ class SpeakerVerifyService:
         audio_files = self.split_audio_by_segments(audio_path, segments)
 
         try:
-            result = [segments[0].copy()]
-            result[0]["speaker"] = "SPEAKER_01"
-            result[0]["similarity"] = None
+            result = []
+            speaker_count = 1
+            result.append({
+                "start": segments[0]["start"],
+                "end": segments[0]["end"],
+                "speaker": f"SPEAKER_{speaker_count:02d}",
+                "similarity": None
+            })
 
             for i in range(1, len(segments)):
-                similarity = self.compute_similarity(audio_files[0], audio_files[i])
-                current_speaker = result[-1]["speaker"]
+                matched_speaker_idx = -1
 
-                if similarity > similarity_threshold:
-                    result[-1]["end"] = segments[i]["end"]
-                    result[-1]["similarity"] = similarity
+                for j in range(i):
+                    similarity = self.compute_similarity(audio_files[j], audio_files[i])
+                    logger.info(f"比较 audio_files[{j}] 和 audio_files[{i}], similarity: {similarity}")
+
+                    if similarity >= similarity_threshold:
+                        matched_speaker_idx = j
+                        break
+
+                if matched_speaker_idx >= 0:
+                    matched_speaker = result[matched_speaker_idx]["speaker"]
+                    similarity = self.compute_similarity(audio_files[matched_speaker_idx], audio_files[i])
+
+                    result.append({
+                        "start": result[matched_speaker_idx]["start"],
+                        "end": segments[i]["end"],
+                        "speaker": matched_speaker,
+                        "similarity": similarity
+                    })
+
+                    for k in range(matched_speaker_idx + 1, len(result) - 1):
+                        result[k]["start"] = result[k + 1]["start"]
+                        result[k]["end"] = result[k + 1]["end"]
+                    result = result[:matched_speaker_idx + 1]
                 else:
-                    speaker_num = int(current_speaker.split("_")[1]) + 1
+                    speaker_count += 1
                     result.append({
                         "start": segments[i]["start"],
                         "end": segments[i]["end"],
-                        "speaker": f"SPEAKER_{speaker_num:02d}",
+                        "speaker": f"SPEAKER_{speaker_count:02d}",
                         "similarity": similarity
                     })
 
