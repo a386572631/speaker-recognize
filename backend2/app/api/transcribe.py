@@ -34,19 +34,23 @@ def merge_asr_and_speaker(timestamps, speaker_segments):
             end = ts["end_time"]
 
         speaker = "SPEAKER_UNKNOWN"
+        similarity = None
         for seg in speaker_segments:
             if start >= seg["start"] and start < seg["end"]:
                 speaker = seg["speaker"]
+                similarity = seg.get("similarity")
                 break
             elif start < seg["start"] and end > seg["start"]:
                 speaker = seg["speaker"]
+                similarity = seg.get("similarity")
                 break
 
         merged.append({
             "token": token,
             "start": start,
             "end": end,
-            "speaker": speaker
+            "speaker": speaker,
+            "similarity": similarity
         })
 
     result = []
@@ -55,7 +59,8 @@ def merge_asr_and_speaker(timestamps, speaker_segments):
             "text": merged[0]["token"],
             "start": merged[0]["start"],
             "end": merged[0]["end"],
-            "speaker": merged[0]["speaker"]
+            "speaker": merged[0]["speaker"],
+            "similarity": merged[0]["similarity"]
         }
 
         for item in merged[1:]:
@@ -66,9 +71,10 @@ def merge_asr_and_speaker(timestamps, speaker_segments):
                 result.append(current)
                 current = {
                     "text": item["token"],
-                    "start_time": item["start"],
-                    "end_time": item["end"],
-                    "speaker": item["speaker"]
+                    "start": item["start"],
+                    "end": item["end"],
+                    "speaker": item["speaker"],
+                    "similarity": item["similarity"]
                 }
         result.append(current)
 
