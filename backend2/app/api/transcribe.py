@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class TranscriptionResult(BaseModel):
     text: str
+    last_speaker: str = None
     segments: list = []
 
 
@@ -133,8 +134,18 @@ async def transcribe_audio(
 
             merged_segments = merge_asr_and_speaker(timestamps, speaker_segments)
 
+            last_speaker = None
+            if merged_segments:
+                last_non_unknown = None
+                for seg in reversed(merged_segments):
+                    if seg.get("speaker") and seg["speaker"] != "SPEAKER_UNKNOWN":
+                        last_non_unknown = seg["speaker"]
+                        break
+                last_speaker = last_non_unknown if last_non_unknown else merged_segments[-1].get("speaker")
+
             return TranscriptionResult(
                 text=full_text,
+                last_speaker=last_speaker,
                 segments=merged_segments
             )
         finally:
