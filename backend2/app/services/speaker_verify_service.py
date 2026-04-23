@@ -87,6 +87,8 @@ class SpeakerVerifyService:
                 matched_speaker_idx = -1
 
                 for j in range(i):
+                    if j >= len(result):
+                        break
                     similarity = self.compute_similarity(audio_files[j], audio_files[i])
                     logger.info(f"比较 audio_files[{j}] 和 audio_files[{i}], similarity: {similarity}")
 
@@ -94,7 +96,7 @@ class SpeakerVerifyService:
                         matched_speaker_idx = j
                         break
 
-                if matched_speaker_idx >= 0:
+                if matched_speaker_idx >= 0 and matched_speaker_idx < len(result):
                     matched_speaker = result[matched_speaker_idx]["speaker"]
                     similarity = self.compute_similarity(audio_files[matched_speaker_idx], audio_files[i])
 
