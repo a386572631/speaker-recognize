@@ -99,18 +99,8 @@ class SpeakerVerifyService:
                 if matched_speaker_idx >= 0 and matched_speaker_idx < len(result):
                     matched_speaker = result[matched_speaker_idx]["speaker"]
                     similarity = self.compute_similarity(audio_files[matched_speaker_idx], audio_files[i])
-
-                    result.append({
-                        "start": result[matched_speaker_idx]["start"],
-                        "end": segments[i]["end"],
-                        "speaker": matched_speaker,
-                        "similarity": similarity
-                    })
-
-                    for k in range(matched_speaker_idx + 1, len(result) - 1):
-                        result[k]["start"] = result[k + 1]["start"]
-                        result[k]["end"] = result[k + 1]["end"]
-                    result = result[:matched_speaker_idx + 1]
+                    result[matched_speaker_idx]["end"] = segments[i]["end"]
+                    result[matched_speaker_idx]["similarity"] = similarity
                 else:
                     speaker_count += 1
                     result.append({
