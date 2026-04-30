@@ -46,7 +46,7 @@ class DiarizationService:
             "model": str(settings.paraformer_model_path),
             "vad_model": str(settings.vad_model_path),
             "punc_model": str(settings.punc_model_path),
-            "spk_model": "iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
+            "spk_model": str(settings.campplus_model_path),
             "device": settings.device,
             "disable_update": True,
             "trust_remote_code": True,

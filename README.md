@@ -59,6 +59,14 @@ speaker-recognize/
 ```bash
 cd backend
 
+# 下载模型
+modelscope download --model iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch --local_dir ./models/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch
+modelscope download --model iic/speech_paraformer-large-vad-punc-spk_asr_nat-zh-cn --local_dir ./models/speech_paraformer-large-vad-punc-spk_asr_nat-zh-cn
+modelscope download --model iic/speech_eres2net_sv_zh-cn_16k-common --local_dir ./models/speech_eres2net_sv_zh-cn_16k-common
+hf download funasr/campplus --local_dir ./models/campplus
+hf download funasr/ct-punc --local_dir ./models/ct-punc
+hf download funasr/fsmn-vad --local_dir ./models/fsmn-vad
+
 # 使用uv安装依赖
 uv sync
 

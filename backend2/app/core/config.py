@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     pyannote_segmentation_model_path: Path = models_dir / "pyannote" / "pyannote-segmentation-zho-001"
     wespeaker_model_path: Path = models_dir / "wespeaker"
 
-    paraformer_model_path: Path = models_dir / "speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch"
+    paraformer_model_path: Path = models_dir / "speech_paraformer-large-vad-punc-spk_asr_nat-zh-cn"
     vad_model_path: Path = models_dir / "fsmn-vad"
     punc_model_path: Path = models_dir / "ct-punc"
     campplus_model_path: Path = models_dir / "campplus"
