@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 class DiarizationService:
     def __init__(self):
         self._pipeline = None
+        self._fun_asr_model = None
 
     def load(self):
         logger.info("加载 pyannote diarization")
@@ -36,6 +37,24 @@ class DiarizationService:
             logger.warning(f"替换 segmentation 模型失败: {e}")
 
         logger.info(f"Pyannote pipeline 加载成功: {settings.device}")
+
+    def load_fun_asr(self):
+        from funasr import AutoModel
+
+        logger.info("加载 Fun-ASR paraformer-zh + Cam++")
+        kwargs = {
+            "model": str(settings.paraformer_model_path),
+            "vad_model": str(settings.vad_model_path),
+            "punc_model": str(settings.punc_model_path),
+            "spk_model": "iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
+            "device": settings.device,
+            "disable_update": True,
+            "trust_remote_code": True,
+        }
+
+        self._fun_asr_model = AutoModel(**kwargs)
+        logger.info(f"Fun-ASR + Cam++ 加载成功: {settings.device}")
+        return self._fun_asr_model
 
     def diarize(self, audio_path: str, num_speakers: int = 0):
         if not self._pipeline:
