@@ -6,95 +6,109 @@
 
 ```
 speaker-recognize/
-├── backend/           # 后端 (FastAPI)
+├── backend/           # 后端服务 (FastAPI)
 │   ├── app/
-│   │   ├── config.py      # 配置
-│   │   ├── main.py       # 应用入口
-│   │   ├── models.py
-│   │   ├── schemas.py
-│   │   ├── services.py
-│   │   ├── utils.py    # 工具
-│   │   └── routes/
-│   │       ├── openai_transcription.py
-│   │       ├── speech.py
-│   │       ├── transcribe.py
-│   │       └── websocket.py
-│   ├── main.py          # 入口文件
+│   │   ├── api/        # API路由
+│   │   │   ├── audio.py        # 音频转录/TTS接口
+│   │   │   ├── transcribe.py  # 转录+说话人分离接口
+│   │   │   └── websocket.py   # WebSocket实时转写
+│   │   ├── core/       # 核心配置
+│   │   │   ├── config.py      # 配置管理
+│   │   │   └── auth.py       # 认证
+│   │   ├── services/   # 业务服务
+│   │   │   ├── asr_service.py         # ASR服务
+│   │   │   ├── diarization_service.py # 说话人分离服务
+│   │   │   ├── speaker_verify_service.py # 说话人验证服务
+│   │   │   └── tts_service.py       # TTS服务
+│   │   └── main.py     # 应用入口
+│   ├── models/        # 预训练模型
 │   ├── pyproject.toml
-│   ├── .env            # 环境配置
-│   ├── env.example     # 环境配置示例
-│   └── models/         # 下载的模型
-        ├── Qwen/             # Qwen ASR模型
-        └── pyannote/         # PyAnnote说话人分割模型
-        └── Fun-ASR-Nano-2512/
-├── frontend/          # 前端 (Vue3 + AntDesign)
+│   ├── .env          # 环境配置
+│   └── uv.lock
+│
+├── realtime/         # 前端 (Vue3 + AntDesign)
 │   ├── src/
 │   │   ├── components/   # 组件
-│   │   │   ├── MicButton.vue      # 录音按钮
-│   │   │   ├── ResultItem.vue    # 单条识别结果
-│   │   │   ├── ResultList.vue   # 识别结果列表
-│   │   │   └── ResultSummary.vue # 识别汇总
-│   │   ├── utils/       # 工具
-│   │   │   ├── audio.js   # 音频处理
-│   │   │   └── websocket.js # WebSocket
-│   │   ├── assets/
-│   │   │   └── main.css
+│   │   ├── composables/  # 组合式API
+│   │   ├── assets/     # 静态资源
 │   │   ├── App.vue
 │   │   └── main.js
 │   ├── public/
-│   ├── index.html
 │   ├── package.json
-│   ├── vite.config.js
-│   └── .env.development # 开发环境配置
+│   └── vite.config.js
+│
 ```
 
 ## 环境要求
 
-- Python 3.10+
+- Python 3.10
 - Node.js 18+
+- pnpm (前端包管理)
 - CUDA (可选，无GPU时自动使用CPU)
 
-## 后端启动
+## 下载模型
+
+后端依赖的模型需要手动下载：
 
 ```bash
 cd backend
 
-# 下载模型
+# Fun-ASR 模型 (ModelScope)
 modelscope download --model iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch --local_dir ./models/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch
 modelscope download --model iic/speech_paraformer-large-vad-punc-spk_asr_nat-zh-cn --local_dir ./models/speech_paraformer-large-vad-punc-spk_asr_nat-zh-cn
-modelscope download --model iic/speech_eres2net_sv_zh-cn_16k-common --local_dir ./models/speech_eres2net_sv_zh-cn_16k-common
-hf download funasr/campplus --local_dir ./models/campplus
-hf download funasr/ct-punc --local_dir ./models/ct-punc
-hf download funasr/fsmn-vad --local_dir ./models/fsmn-vad
 
-# 使用uv安装依赖
+# Qwen ASR 模型 (ModelScope)
+modelscope download --model Qwen/Qwen3-ASR-1.7B --local_dir ./models/Qwen/Qwen3-ASR-1.7B
+modelscope download --model Qwen/Qwen3-ForcedAligner-0.6B --local_dir ./models/Qwen/Qwen3-ForcedAligner-0.6B
+
+# VAD模型 (ModelScope)
+modelscope download --model iic/speech_fsmn-vad --local_dir ./models/fsmn-vad
+
+# 标点模型 (HuggingFace)
+# 需手动下载: https://huggingface.co/funasr/ct-punc
+
+# Camp++ 说话人模型 (HuggingFace)
+# 需手动下载: https://huggingface.co/funasr/campplus
+
+# PyAnnote 说话人分离模型
+# 首次使用自动下载，需设置 PYANNOTE_TOKEN 环境变量
+```
+
+## 启动后端
+
+```bash
+cd backend
+
+# 安装依赖
 uv sync
 
 # 启动服务
-uv run python main.py
+uv run uvicorn app.main:app --host 0.0.0.0 --port 10030
 ```
 
 服务启动后：
-- HTTP API: http://localhost:5062
-- WebSocket: ws://localhost:5062/ws
+- API文档: http://localhost:10030/docs
+- 健康检查: http://localhost:10030/health
 
-## 前端启动
+## 启动前端
 
 ```bash
-cd frontend
+cd realtime
 
 # 安装依赖
-npm install
+pnpm install
 
 # 启动开发服务器
 npm run dev
 ```
 
+前端默认运行在 http://localhost:5173
+
 ## API接口
 
-### WebSocket - 语音识别
+### WebSocket - 实时语音转写
 
-连接: `ws://localhost:5062/ws`
+连接: `ws://localhost:10030/ws/transcribe`
 
 认证: 发送 `Authorization: Bearer <API_KEY>`
 
@@ -106,26 +120,76 @@ npm run dev
 }
 ```
 
-### HTTP - 说话人识别
+### HTTP - 批量转录+说话人分离
+
+POST `/transcribe`
+
+Headers: `Authorization: Bearer <API_KEY>`
+
+参数:
+- file: 音频文件 (multipart/form-data)
+- model: 模型名称 (可选，默认qwen)
+- language: 语言 (默认auto)
+- num_speakers: 说话人数量 (可选)
+
+### HTTP - 音频转录
 
 POST `/v1/audio/transcriptions`
 
 Headers: `Authorization: Bearer <API_KEY>`
 
-支持 `multipart/form-data` 上传文件或 JSON body 传 base64 音频。
+### HTTP - 语音合成
+
+POST `/v1/audio/speech`
+
+Headers: `Authorization: Bearer <API_KEY>`
+
+Body:
+```json
+{
+  "input": "要合成的内容",
+  "model": "tts-1",
+  "voice": "zh-CN-XiaoxiaoNeural"
+}
+```
+
+### Health Check
+
+GET `/health`
 
 ## 配置 (.env)
 
 ```bash
-API_KEY=your_api_key
-MODEL_NAME=Qwen3-ASR-1.7B  # 或 Qwen3-ASR-0.6B
+# 模型选择: fun-asr-nano-2512 / qwen
+MODEL=qwen
+
+# Fun-ASR模型路径
+FUN_ASR_MODEL=./models/Fun-ASR-Nano-2512
+QWEN_ASR_MODEL=./models/Qwen/Qwen3-ASR-1.7B
+
+# PyAnnote HuggingFace Token
 PYANNOTE_TOKEN=your_huggingface_token
+
+# API认证密钥
+OPENAI_API_KEY=your_api_key
+
+# TTS配置 (edge-tts / qwen-tts)
+TTS_MODEL=edge-tts
+TTS_VOICE=zh-CN-XiaoxiaoNeural
+
+# 热词API (可选)
+HOTWORD_API_URL=https://example.com/api
+
+# WeSpeaker说话人验证 (可选)
+WESPEAKER_ENABLED=True
 ```
 
 ## 功能特性
 
 - VAD自动检测语音结束
 - 实时语音转写
-- 说话人区分
+- 说话人区分 (PyAnnote + Cam++)
+- 说话人验证 (WeSpeaker)
+- 标点插入
+- TTS语音合成
 - 深色主题界面
-- 音频下载
