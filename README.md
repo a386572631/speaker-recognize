@@ -72,6 +72,9 @@ modelscope download --model iic/speech_fsmn-vad --local_dir ./models/fsmn-vad
 
 # PyAnnote 说话人分离模型
 # 首次使用自动下载，需设置 PYANNOTE_TOKEN 环境变量
+
+# 还需访问：https://github.com/wenet-e2e/wespeaker 和 https://github.com/huggingface/diarizers 
+# 分别安装依赖 uv pip install -e .
 ```
 
 ## 启动后端
@@ -161,7 +164,7 @@ GET `/health`
 
 ```bash
 # 模型选择: fun-asr-nano-2512 / qwen
-MODEL=qwen
+MODEL=funasr
 
 # Fun-ASR模型路径
 FUN_ASR_MODEL=./models/Fun-ASR-Nano-2512
