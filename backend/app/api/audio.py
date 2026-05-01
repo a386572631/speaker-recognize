@@ -1,8 +1,9 @@
 import base64
 import tempfile
 import os
+import io
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 from app.services.asr_service import asr_service
 from app.services.tts_service import tts_service
@@ -56,16 +57,26 @@ async def create_transcription(
 @router.post("/speech")
 async def create_speech(request: SpeechRequest, _: None = Depends(verify_api_key)):
     try:
-        voice = request.voice if request.voice else settings.tts_voice
-        tts_model = settings.tts_model.lower()
-
-        if tts_model == "qwen-tts":
-            audio_data = tts_service.synthesize_qwen(request.input, voice)
-        else:
-            audio_data = await tts_service.synthesize_edge(request.input, voice)
+        audio_data = tts_service.synthesize(request.input, request.voice)
 
         return Response(
             content=audio_data,
+            media_type="audio/wav",
+            headers={"Content-Disposition": "attachment; filename=speech.wav"},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/speechStream")
+async def create_speech_stream(request: SpeechRequest, _: None = Depends(verify_api_key)):
+    try:
+        def generate():
+            for chunk in tts_service.synthesize_cosyvoice_stream(request.input, request.voice):
+                yield chunk
+
+        return StreamingResponse(
+            generate(),
             media_type="audio/wav",
             headers={"Content-Disposition": "attachment; filename=speech.wav"},
         )

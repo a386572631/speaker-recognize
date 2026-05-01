@@ -11,9 +11,22 @@ class TTSService:
     def __init__(self):
         self._model_loaded = False
         self._qwen_tts_model: Optional[object] = None
+        self._cosyvoice_model: Optional[object] = None
 
     def load(self):
-        logger.info("默认使用 edge-tts 服务")
+        logger.info(f"TTS服务配置: {settings.tts_model}")
+
+    def _get_cosyvoice_model_path(self) -> str:
+        local_path = settings.cosyvoice_model_path
+        if Path(local_path).exists():
+            return str(local_path)
+        return "FunAudioLLM/Fun-CosyVoice3-0.5B-2512"
+
+    def _get_qwen_tts_model_path(self) -> str:
+        local_path = settings.models_dir / "Qwen" / "Qwen3-TTS-12Hz-1.7B-CustomVoice"
+        if local_path.exists():
+            return str(local_path)
+        return "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
 
     async def synthesize_edge(self, text: str, voice: str = "zh-CN-XiaoxiaoNeural") -> bytes:
         import edge_tts
@@ -27,14 +40,82 @@ class TTSService:
     def synthesize(self, text: str, voice: str = "") -> bytes:
         if not voice:
             voice = settings.tts_voice
-        import asyncio
-        return asyncio.run(self.synthesize_edge(text, voice))
 
-    def _get_qwen_tts_model_path(self) -> str:
-        local_path = settings.models_dir / "Qwen" / "Qwen3-TTS-12Hz-1.7B-CustomVoice"
-        if local_path.exists():
-            return str(local_path)
-        return "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
+        tts_model = settings.tts_model.lower()
+
+        if tts_model == "cosyvoice3" or tts_model == "cosyvoice":
+            return self.synthesize_cosyvoice(text, voice)
+        elif tts_model == "qwen-tts" or tts_model == "qwen":
+            return self.synthesize_qwen(text, voice)
+        else:
+            import asyncio
+            return asyncio.run(self.synthesize_edge(text, voice))
+
+    def get_prompt_wav(self, voice: str = "") -> str:
+        if not voice:
+            voice = settings.tts_voice
+
+        voice_map = {
+            "default": "app/tts_wav/zero_shot_prompt.wav",
+        }
+        return voice_map.get(voice, "app/tts_wav/zero_shot_prompt.wav")
+
+    def synthesize_cosyvoice(self, text: str, voice: str = "default", instruction: str = "用开心的语气说") -> bytes:
+        from cosyvoice.cli.cosyvoice import AutoModel
+        import torchaudio
+
+        model_path = self._get_cosyvoice_model_path()
+        logger.info(f"加载 CosyVoice3 模型: {model_path}")
+
+        self._cosyvoice_model = AutoModel(model_dir=model_path)
+
+        prompt_wav = self.get_prompt_wav(voice)
+
+        stream = self._cosyvoice_model.inference_instruct2(
+            tts_text=f"{instruction}<|endofprompt|>{text}",
+            instruct_text="",
+            prompt_wav=prompt_wav,
+            stream=False
+        )
+
+        buffer = io.BytesIO()
+        for result in stream:
+            audio_tensor = result["tts_speech"]
+            wav_tensor = audio_tensor.cpu().detach()
+            torchaudio.save(buffer, wav_tensor, self._cosyvoice_model.sample_rate, format="wav")
+            break
+
+        buffer.seek(0)
+        return buffer.read()
+
+    def synthesize_cosyvoice_stream(self, text: str, voice: str = "default", instruction: str = "用开心的语气说"):
+        from cosyvoice.cli.cosyvoice import AutoModel
+        import torchaudio
+
+        if self._cosyvoice_model is None:
+            model_path = self._get_cosyvoice_model_path()
+            logger.info(f"加载 CosyVoice3 模型: {model_path}")
+            self._cosyvoice_model = AutoModel(model_dir=model_path)
+
+        prompt_wav = self.get_prompt_wav(voice)
+
+        stream = self._cosyvoice_model.inference_instruct2(
+            tts_text=f"{instruction}<|endofprompt|>{text}",
+            instruct_text="",
+            prompt_wav=prompt_wav,
+            stream=True
+        )
+
+        buffer = io.BytesIO()
+        for result in stream:
+            audio_tensor = result["tts_speech"]
+            wav_tensor = audio_tensor.cpu().detach()
+            buffer = io.BytesIO()
+            torchaudio.save(buffer, wav_tensor, self._cosyvoice_model.sample_rate, format="wav")
+            buffer.seek(0)
+            yield buffer.read()
+            buffer.seek(0)
+            buffer.truncate(0)
 
     def synthesize_qwen(self, text: str, voice: str = "Chengu") -> bytes:
         from qwen_tts import Qwen3TTSModel

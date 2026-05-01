@@ -28,6 +28,7 @@ class Settings(BaseSettings):
 
     tts_model: str = "edge-tts"
     tts_voice: str = "zh-CN-XiaoxiaoNeural"
+    cosyvoice_model_path: str = "./models/Fun-CosyVoice3-0.5B-2512"
 
     hotword_api_url: str = ""
     wespeaker_enabled: bool = False

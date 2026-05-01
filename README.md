@@ -53,16 +53,36 @@ speaker-recognize/
 ```bash
 cd backend
 
-# Fun-ASR 模型 (ModelScope)
+# Fun-ASR 模型
+hf download FunAudioLLM/Fun-ASR-Nano-2512 --local_dir ./models/Fun-ASR-Nano-2512
+
 modelscope download --model iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch --local_dir ./models/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch
 modelscope download --model iic/speech_paraformer-large-vad-punc-spk_asr_nat-zh-cn --local_dir ./models/speech_paraformer-large-vad-punc-spk_asr_nat-zh-cn
 
+# VAD模型
+modelscope download --model iic/speech_fsmn-vad --local_dir ./models/fsmn-vad
+
+# 标点
+hf download funasr/ct-punc --local_dir ./models/ct-punc
+
+# 说话人日志 CAM++
+hf download funasr/campplus --local-dir ./models/campplus
+
 # Qwen ASR 模型 (ModelScope)
 modelscope download --model Qwen/Qwen3-ASR-1.7B --local_dir ./models/Qwen/Qwen3-ASR-1.7B
+modelscope download --model Qwen/Qwen3-ASR-0.6B --local_dir ./models/Qwen/Qwen3-ASR-0.6B
 modelscope download --model Qwen/Qwen3-ForcedAligner-0.6B --local_dir ./models/Qwen/Qwen3-ForcedAligner-0.6B
 
-# VAD模型 (ModelScope)
-modelscope download --model iic/speech_fsmn-vad --local_dir ./models/fsmn-vad
+# TTS 模型
+# CosyVoice3
+hf download FunAudioLLM/Fun-CosyVoice3-0.5B-2512 --local-dir ./backend/models/Fun-CosyVoice3-0.5B-2512
+
+# 安装Cosyvoice3 https://github.com/FunAudioLLM/CosyVoice
+# 先注释掉`openai-whisper==20231117`
+uv pip install -r ../CosyVoice/requirements.txt
+pip install "setuptools==81.0.0" -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host=mirrors.aliyun.com
+pip install openai-whisper==20231117 --no-build-isolation -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host=mirrors.aliyun.com
+
 
 # 标点模型 (HuggingFace)
 # 需手动下载: https://huggingface.co/funasr/ct-punc
@@ -83,7 +103,17 @@ modelscope download --model iic/speech_fsmn-vad --local_dir ./models/fsmn-vad
 cd backend
 
 # 安装依赖
-uv sync
+  # 安装pyproject.toml
+  uv sync
+
+  # 安装 diarizers 依赖
+  uv pip install -e ~/Documents/Tools/diarizers-main
+
+  # 安装 wespeaker 依赖
+  uv pip install -e ../wespeaker
+
+  # 安装cosyvoice3
+  uv pip install -r ../CosyVoice/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host=mirrors.aliyun.com
 
 # 启动服务
 uv run uvicorn app.main:app --host 0.0.0.0 --port 10030
