@@ -15,12 +15,20 @@ class TTSService:
 
     def load(self):
         logger.info(f"TTS服务配置: {settings.tts_model}")
+        if "cosyvoice" in settings.tts_model.lower():
+            self.load_cosyvoice_model()
 
-    def _get_cosyvoice_model_path(self) -> str:
+    def load_cosyvoice_model(self):
         local_path = settings.cosyvoice_model_path
-        if Path(local_path).exists():
+        if not Path(local_path).exists():
+            logger.info(f"模型不存在：{local_path}")
             return str(local_path)
-        return "FunAudioLLM/Fun-CosyVoice3-0.5B-2512"
+        from cosyvoice.cli.cosyvoice import AutoModel
+        import torchaudio
+        import sys
+        sys.path.append('third_party/Matcha-TTS')
+        logger.info(f"加载 CosyVoice3 模型: {local_path}")
+        self._cosyvoice_model = AutoModel(model_dir=local_path)
 
     def _get_qwen_tts_model_path(self) -> str:
         local_path = settings.models_dir / "Qwen" / "Qwen3-TTS-12Hz-1.7B-CustomVoice"
@@ -61,16 +69,6 @@ class TTSService:
         return voice_map.get(voice, "app/tts_wav/zero_shot_prompt.wav")
 
     def synthesize_cosyvoice(self, text: str, voice: str = "default", instruction: str = "用开心的语气说") -> bytes:
-        from cosyvoice.cli.cosyvoice import AutoModel
-        import torchaudio
-        import sys
-        sys.path.append('third_party/Matcha-TTS')
-
-        model_path = self._get_cosyvoice_model_path()
-        logger.info(f"加载 CosyVoice3 模型: {model_path}")
-
-        self._cosyvoice_model = AutoModel(model_dir=model_path)
-
         prompt_wav = self.get_prompt_wav(voice)
 
         stream = self._cosyvoice_model.inference_instruct2(
@@ -91,16 +89,6 @@ class TTSService:
         return buffer.read()
 
     def synthesize_cosyvoice_stream(self, text: str, voice: str = "default", instruction: str = "用开心的语气说"):
-        from cosyvoice.cli.cosyvoice import AutoModel
-        import torchaudio
-        import sys
-        sys.path.append('third_party/Matcha-TTS')
-
-        if self._cosyvoice_model is None:
-            model_path = self._get_cosyvoice_model_path()
-            logger.info(f"加载 CosyVoice3 模型: {model_path}")
-            self._cosyvoice_model = AutoModel(model_dir=model_path)
-
         prompt_wav = self.get_prompt_wav(voice)
 
         stream = self._cosyvoice_model.inference_instruct2(
