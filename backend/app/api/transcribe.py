@@ -116,66 +116,48 @@ async def transcribe_audio(
             model = model.lower()
 
             if "fun-asr" in model or "funasr" in model:
-                # # 使用 Fun-ASR + Cam++ 进行识别和说话人分割
-                # fun_asr_model = diarization_service.load_fun_asr()
-                # asr_result = fun_asr_model.generate(
-                #     input=[tmp_path],
-                #     language="zh",
-                #     itn=True,
-                #     hotwords=asr_service.get_hotwords_text(),
-                #     return_spk_res=True
-                # )
-                # result_data = asr_result[0]
-                # print(f"result_data:{result_data}")
-                # full_text = result_data.get("text", "")
-
-                # # 提取说话人embedding
-                # spk_embedding = result_data.get("spk_embedding", [])
-                # if spk_embedding and len(spk_embedding) > 0:
-                #     spk_embedding = spk_embedding[0].get("embedding", [])
-
-                # # 从Fun-ASR结果中提取说话人信息 - 使用sentence_info
-                # sentence_info = result_data.get("sentence_info", [])
-                # if sentence_info:
-                #     merged_segments = []
-                #     for seg in sentence_info:
-                #         text = seg.get("text", "")
-                #         start = seg.get("start", 0)
-                #         end = seg.get("end", 0)
-                #         spk = seg.get("spk", "SPEAKER_UNKNOWN")
-                #         merged_segments.append({
-                #             "text": text,
-                #             "start": start,
-                #             "end": end,
-                #             "speaker": f"SPEAKER_{spk:02d}" if spk is not None else "SPEAKER_UNKNOWN",
-                #         })
-                # else:
-                #     merged_segments = []
-
-                # last_speaker = None
-                # if merged_segments:
-                #     last_speaker = merged_segments[-1].get("speaker")
-                asr_result = asr_service.qwen_asr.transcribe(
-                    audio=[tmp_path],
-                    language="Chinese",
-                    return_time_stamps=True,
+                fun_asr_model = diarization_service.load_fun_asr()
+                asr_result = fun_asr_model.generate(
+                    input=[tmp_path],
+                    language="zh",
+                    itn=True,
+                    hotwords=asr_service.get_hotwords_text(),
+                    return_spk_res=True
                 )
-                full_text = asr_result[0].text
-                timestamps = asr_result[0].time_stamps.items
+                result_data = asr_result[0]
+                print(f"result_data:{result_data}")
+                full_text = result_data.get("text", "")
 
-                logger.info("每个字的timestamp：" + str(timestamps))
-                speaker_segments = diarization_service.diarize(tmp_path, num_speakers)
-                logger.info("说话人聚类结果：" + str(speaker_segments))
+                spk_embedding = result_data.get("spk_embedding", [])
+                if spk_embedding and len(spk_embedding) > 0:
+                    spk_embedding = spk_embedding[0].get("embedding", [])
 
-                if settings.wespeaker_enabled and speaker_verify_service._model:
-                    speaker_segments = speaker_verify_service.verify_and_merge(
-                        tmp_path,
-                        speaker_segments,
-                        similarity_threshold=0.7
-                    )
-                    logger.info("wespeaker聚类结果：" + str(speaker_segments))
+                sentence_info = result_data.get("sentence_info", [])
+                if sentence_info:
+                    merged_segments = []
+                    for seg in sentence_info:
+                        text = seg.get("text", "")
+                        start = seg.get("start", 0)
+                        end = seg.get("end", 0)
+                        spk = seg.get("spk", "SPEAKER_UNKNOWN")
+                        merged_segments.append({
+                            "text": text,
+                            "start": start,
+                            "end": end,
+                            "speaker": f"SPEAKER_{spk:02d}" if spk is not None else "SPEAKER_UNKNOWN",
+                        })
+                else:
+                    merged_segments = []
 
-                merged_segments = merge_asr_and_speaker(timestamps, speaker_segments)
+                if settings.wespeaker_enabled and speaker_verify_service._model and merged_segments:
+                    speaker_segments = diarization_service.diarize(tmp_path, num_speakers)
+                    if speaker_segments:
+                        merged_segments = speaker_verify_service.verify_and_merge(
+                            tmp_path,
+                            speaker_segments,
+                            similarity_threshold=0.7
+                        )
+                        logger.info("wespeaker聚类结果：" + str(merged_segments))
 
                 last_speaker = None
                 if merged_segments:
@@ -185,7 +167,6 @@ async def transcribe_audio(
                             break
                     if not last_speaker:
                         last_speaker = merged_segments[-1].get("speaker")
-
             else:
                 # 使用 Qwen-ASR + pyannote 进行识别和说话人分割
                 asr_result = asr_service.qwen_asr.transcribe(
