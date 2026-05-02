@@ -6,6 +6,12 @@ const API_KEY = import.meta.env.VITE_API_KEY
 const WS_HOST = import.meta.env.VITE_WS_HOST || 'wss://wsyy.wzhospital.cn:8443'
 const API_HOST = import.meta.env.VITE_API_HOST || 'https://wsyy.wzhospital.cn:8443'
 
+const apiClient = axios.create({
+  baseURL: import.meta.env.MODE === 'development' ? '/api' : API_HOST,
+  timeout: 30000,
+  headers: { 'Authorization': `Bearer ${API_KEY}` }
+})
+
 export function useAudioRecorder(numSpeaker) {
   const isRecording = ref(false)
   const isPaused = ref(false)
@@ -190,12 +196,7 @@ export function useAudioRecorder(numSpeaker) {
       formData.append('file', fullRecordedBlob, 'audio.wav')
       formData.append('num_speaker', toValue(numSpeaker))
       
-      const response = await axios.post('/api/stt/speaker/transcribe', formData, {
-        headers: { 
-          'Authorization': `Bearer ${API_KEY}`
-        },
-        timeout: 30000
-      })
+      const response = await apiClient.post('/stt/speaker/transcribe', formData)
       
       const data = response.data
       
@@ -318,7 +319,7 @@ export function useAudioRecorder(numSpeaker) {
       formData.append('file', blob, 'audio.wav')
       formData.append('num_speaker', toValue(numSpeaker))
 
-      const response = await axios.post('/api/stt/speaker/transcribe', formData, {
+      const response = await axios.post(`${API_PREFIX}/stt/speaker/transcribe`, formData, {
         headers: { 
           'Content-Type': 'multipart/form-data',
           'Authorization': `Bearer ${API_KEY}`
