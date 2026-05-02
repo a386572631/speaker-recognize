@@ -57,7 +57,18 @@ class TTSService:
             return self.synthesize_qwen(text, voice)
         else:
             import asyncio
-            return asyncio.run(self.synthesize_edge(text, voice))
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            
+            if loop and loop.is_running():
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    future = pool.submit(asyncio.run, self.synthesize_edge(text, voice))
+                    return future.result()
+            else:
+                return asyncio.run(self.synthesize_edge(text, voice))
 
     def get_prompt_wav(self, voice: str = "") -> str:
         if not voice:
@@ -72,8 +83,8 @@ class TTSService:
         prompt_wav = self.get_prompt_wav(voice)
 
         stream = self._cosyvoice_model.inference_instruct2(
-            tts_text=f"{instruction}<|endofprompt|>{text}",
-            instruct_text="",
+            tts_text=text,
+            instruct_text=f"{instruction}<|endofprompt|>",
             prompt_wav=prompt_wav,
             stream=False
         )
@@ -92,8 +103,8 @@ class TTSService:
         prompt_wav = self.get_prompt_wav(voice)
 
         stream = self._cosyvoice_model.inference_instruct2(
-            tts_text=f"{instruction}<|endofprompt|>{text}",
-            instruct_text="",
+            tts_text=text,
+            instruct_text=f"{instruction}<|endofprompt|>",
             prompt_wav=prompt_wav,
             stream=True
         )
