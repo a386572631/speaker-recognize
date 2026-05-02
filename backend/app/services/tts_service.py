@@ -1,4 +1,5 @@
 import logging
+import torchaudio
 import io
 from pathlib import Path
 from typing import Optional
@@ -24,7 +25,6 @@ class TTSService:
             logger.info(f"模型不存在：{local_path}")
             return str(local_path)
         from cosyvoice.cli.cosyvoice import AutoModel
-        import torchaudio
         import sys
         sys.path.append('third_party/Matcha-TTS')
         logger.info(f"加载 CosyVoice3 模型: {local_path}")
@@ -77,7 +77,7 @@ class TTSService:
             prompt_wav=prompt_wav,
             stream=False
         )
-
+        
         buffer = io.BytesIO()
         for result in stream:
             audio_tensor = result["tts_speech"]
