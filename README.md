@@ -112,9 +112,6 @@ cd backend
   # 安装 wespeaker 依赖
   uv pip install -e ../wespeaker
 
-  # 安装cosyvoice3
-  uv pip install -r ../CosyVoice/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host=mirrors.aliyun.com
-
 # 启动服务
 uv run uvicorn app.main:app --host 0.0.0.0 --port 10030
 ```

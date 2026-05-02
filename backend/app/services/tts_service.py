@@ -63,6 +63,8 @@ class TTSService:
     def synthesize_cosyvoice(self, text: str, voice: str = "default", instruction: str = "用开心的语气说") -> bytes:
         from cosyvoice.cli.cosyvoice import AutoModel
         import torchaudio
+        import sys
+        sys.path.append('third_party/Matcha-TTS')
 
         model_path = self._get_cosyvoice_model_path()
         logger.info(f"加载 CosyVoice3 模型: {model_path}")
@@ -91,6 +93,8 @@ class TTSService:
     def synthesize_cosyvoice_stream(self, text: str, voice: str = "default", instruction: str = "用开心的语气说"):
         from cosyvoice.cli.cosyvoice import AutoModel
         import torchaudio
+        import sys
+        sys.path.append('third_party/Matcha-TTS')
 
         if self._cosyvoice_model is None:
             model_path = self._get_cosyvoice_model_path()
