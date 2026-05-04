@@ -84,12 +84,16 @@ class TTSService:
         prompt_wav = self.get_prompt_wav(voice)
         logger.info(f"复刻音频：{prompt_wav}")
 
-        stream = self._cosyvoice_model.inference_instruct2(
-            tts_text=text,
-            instruct_text=f"{instruction}<|endofprompt|>",
-            prompt_wav=prompt_wav,
-            stream=False
-        )
+        #stream = self._cosyvoice_model.inference_instruct2(
+        #    tts_text=text,
+        #    instruct_text=f"{instruction}<|endofprompt|>",
+        #    prompt_wav=prompt_wav,
+        #    stream=False
+        #)
+        stream = self._cosyvoice_model.inference_zero_shot(text,
+                            'You are a helpful assistant.<|endofprompt|>希望你以后能够做的比我还好呦。',
+                            prompt_wav, 
+                            stream=False)
         
         buffer = io.BytesIO()
         for result in stream:
@@ -105,12 +109,16 @@ class TTSService:
         prompt_wav = self.get_prompt_wav(voice)
         logger.info(f"复刻音频：{prompt_wav}")
 
-        stream = self._cosyvoice_model.inference_instruct2(
-            tts_text=text,
-            instruct_text=f"{instruction}<|endofprompt|>",
-            prompt_wav=prompt_wav,
-            stream=True
-        )
+        #stream = self._cosyvoice_model.inference_instruct2(
+        #    tts_text=text,
+        #    instruct_text=f"{instruction}<|endofprompt|>",
+        #    prompt_wav=prompt_wav,
+        #    stream=True
+        #)
+        stream = self._cosyvoice_model.inference_zero_shot(text,
+                            'You are a helpful assistant.<|endofprompt|>希望你以后能够做的比我还好呦。',
+                            prompt_wav,
+                            stream=False)
 
         buffer = io.BytesIO()
         for result in stream:
