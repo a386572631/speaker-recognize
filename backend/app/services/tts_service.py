@@ -114,14 +114,18 @@ class TTSService:
 
         buffer = io.BytesIO()
         for result in stream:
-            audio_tensor = result["tts_speech"]
-            wav_tensor = audio_tensor.cpu().detach()
-            buffer = io.BytesIO()
-            torchaudio.save(buffer, wav_tensor, self._cosyvoice_model.sample_rate, format="wav")
-            buffer.seek(0)
-            yield buffer.read()
-            buffer.seek(0)
-            buffer.truncate(0)
+            #audio_tensor = result["tts_speech"]
+            #wav_tensor = audio_tensor.cpu().detach()
+            #buffer = io.BytesIO()
+            #torchaudio.save(buffer, wav_tensor, self._cosyvoice_model.sample_rate, format="wav")
+            #buffer.seek(0)
+            #yield buffer.read()
+            #buffer.seek(0)
+            #buffer.truncate(0)
+            import torch
+            audio_tensor = result["tts_speech"]  # Shape: [channels, samples]
+            audio_int16 = (audio_tensor.cpu() * 32767).to(torch.int16)
+            yield audio_int16.numpy().tobytes()
 
     def synthesize_qwen(self, text: str, voice: str = "Chengu") -> bytes:
         from qwen_tts import Qwen3TTSModel
