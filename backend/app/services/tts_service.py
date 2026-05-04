@@ -80,7 +80,7 @@ class TTSService:
         }
         return voice_map.get(voice, "app/tts_wav/zero_shot_prompt.wav")
 
-    def synthesize_cosyvoice(self, text: str, voice: str = "default", instruction: str = "用开心的语气说") -> bytes:
+    def synthesize_cosyvoice(self, text: str, voice: str = "default", instruction: str = "") -> bytes:
         prompt_wav = self.get_prompt_wav(voice)
         logger.info(f"复刻音频：{prompt_wav}")
 
@@ -101,7 +101,7 @@ class TTSService:
         buffer.seek(0)
         return buffer.read()
 
-    def synthesize_cosyvoice_stream(self, text: str, voice: str = "default", instruction: str = "用开心的语气说"):
+    def synthesize_cosyvoice_stream(self, text: str, voice: str = "default", instruction: str = ""):
         prompt_wav = self.get_prompt_wav(voice)
         logger.info(f"复刻音频：{prompt_wav}")
 
