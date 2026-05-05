@@ -1,11 +1,20 @@
 import logging
 import torchaudio
 import io
+import asyncio
+import re
 from pathlib import Path
 from typing import Optional
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def clean_text(text: str) -> str:
+    """Remove special characters like * and replace with space."""
+    text = re.sub(r'[*#@$%^&+=]', ' ', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
 
 
 class TTSService:
@@ -45,7 +54,15 @@ class TTSService:
                 buffer.write(chunk["data"])
         return buffer.getvalue()
 
+    async def synthesize_edge_stream(self, text: str, voice: str = "zh-CN-XiaoxiaoNeural"):
+        import edge_tts
+        communicate = edge_tts.Communicate(text, voice)
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                yield chunk["data"]
+
     def synthesize(self, text: str, voice: str = "") -> bytes:
+        text = clean_text(text)
         if not voice:
             voice = settings.tts_voice
 
@@ -57,18 +74,53 @@ class TTSService:
             return self.synthesize_qwen(text, voice)
         else:
             import asyncio
+            return asyncio.run(self.synthesize_edge(text, voice))
+
+    async def synthesize_async(self, text: str, voice: str = "") -> bytes:
+        text = clean_text(text)
+        if not voice:
+            voice = settings.tts_voice
+
+        tts_model = settings.tts_model.lower()
+
+        if tts_model == "cosyvoice3" or tts_model == "cosyvoice":
+            return self.synthesize_cosyvoice(text, voice)
+        elif tts_model == "qwen-tts" or tts_model == "qwen":
+            return self.synthesize_qwen(text, voice)
+        else:
+            return await self.synthesize_edge(text, voice)
+
+    def synthesize_stream(self, text: str, voice: str = ""):
+        text = clean_text(text)
+        if not voice:
+            voice = settings.tts_voice
+
+        tts_model = settings.tts_model.lower()
+
+        if tts_model == "cosyvoice3" or tts_model == "cosyvoice":
+            return self.synthesize_cosyvoice_stream(text, voice)
+        else:
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
             try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = None
-            
-            if loop and loop.is_running():
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    future = pool.submit(asyncio.run, self.synthesize_edge(text, voice))
-                    return future.result()
-            else:
-                return asyncio.run(self.synthesize_edge(text, voice))
+                return loop.run_until_complete(self.synthesize_stream_async(text, voice))
+            finally:
+                loop.close()
+
+    async def synthesize_stream_async(self, text: str, voice: str = ""):
+        text = clean_text(text)
+        if not voice:
+            voice = settings.tts_voice
+
+        tts_model = settings.tts_model.lower()
+
+        if tts_model == "cosyvoice3" or tts_model == "cosyvoice":
+            for chunk in self.synthesize_cosyvoice_stream(text, voice):
+                yield chunk
+        else:
+            async for chunk in self.synthesize_edge_stream(text, voice):
+                yield chunk
 
     def get_prompt_wav(self, voice: str = "") -> str:
         if not voice:

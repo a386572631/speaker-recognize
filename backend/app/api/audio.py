@@ -2,6 +2,7 @@ import base64
 import tempfile
 import os
 import io
+import asyncio
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
@@ -57,7 +58,7 @@ async def create_transcription(
 @router.post("/speech")
 async def create_speech(request: SpeechRequest, _: None = Depends(verify_api_key)):
     try:
-        audio_data = tts_service.synthesize(request.input, request.voice)
+        audio_data = await tts_service.synthesize_async(request.input, request.voice)
 
         return Response(
             content=audio_data,
@@ -71,8 +72,8 @@ async def create_speech(request: SpeechRequest, _: None = Depends(verify_api_key
 @router.post("/speechStream")
 async def create_speech_stream(request: SpeechRequest, _: None = Depends(verify_api_key)):
     try:
-        def generate():
-            for chunk in tts_service.synthesize_cosyvoice_stream(request.input, request.voice):
+        async def generate():
+            async for chunk in tts_service.synthesize_stream_async(request.input, request.voice):
                 yield chunk
 
         return StreamingResponse(
@@ -80,21 +81,6 @@ async def create_speech_stream(request: SpeechRequest, _: None = Depends(verify_
             media_type="audio/wav",
             headers={"Content-Disposition": "attachment; filename=speech.wav"},
         )
-        #def generate():
-        #    for pcm_chunk in tts_service.synthesize_cosyvoice_stream(
-        #        request.input, request.voice
-        #    ):
-        #        yield pcm_chunk
-
-        #return StreamingResponse(
-        #    generate(),
-        #    media_type="audio/L16",
-        #    headers={
-        #        "X-Sample-Rate": str(tts_service._cosyvoice_model.sample_rate),
-        #        "X-Channels": "1",
-        #        "X-Bits": "16",
-        #    }
-        #)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
