@@ -85,10 +85,16 @@ class TTSService:
         logger.info(f"复刻音频：{prompt_wav}")
 
         #stream = self._cosyvoice_model.inference_instruct2(
-        #    tts_text=text,
-        #    instruct_text=f"{instruction}<|endofprompt|>",
+        #    tts_text=f"{instruction}<|endofprompt|>{text}",
+        #    instruct_text="",
         #    prompt_wav=prompt_wav,
         #    stream=False
+        #)
+        #stream = self._cosyvoice_model.inference_instruct2(
+        #        text,
+        #        'You are a helpful assistant. 请用尽可能快地语速说一句话。<|endofprompt|>',
+        #        prompt_wav,
+        #        stream=False
         #)
         stream = self._cosyvoice_model.inference_zero_shot(text,
                             'You are a helpful assistant.<|endofprompt|>希望你以后能够做的比我还好呦。',
@@ -110,30 +116,36 @@ class TTSService:
         logger.info(f"复刻音频：{prompt_wav}")
 
         #stream = self._cosyvoice_model.inference_instruct2(
-        #    tts_text=text,
-        #    instruct_text=f"{instruction}<|endofprompt|>",
+        #    tts_text=f"{instruction}<|endofprompt|>{text}",
+        #    instruct_text="",
         #    prompt_wav=prompt_wav,
         #    stream=True
+        #)
+        #stream = self._cosyvoice_model.inference_instruct2(
+        #        text, 
+        #        'You are a helpful assistant. 请用尽可能快地语速说一句话。<|endofprompt|>',
+        #        prompt_wav, 
+        #        stream=True
         #)
         stream = self._cosyvoice_model.inference_zero_shot(text,
                             'You are a helpful assistant.<|endofprompt|>希望你以后能够做的比我还好呦。',
                             prompt_wav,
-                            stream=False)
+                            stream=True)
 
         buffer = io.BytesIO()
         for result in stream:
-            #audio_tensor = result["tts_speech"]
-            #wav_tensor = audio_tensor.cpu().detach()
-            #buffer = io.BytesIO()
-            #torchaudio.save(buffer, wav_tensor, self._cosyvoice_model.sample_rate, format="wav")
-            #buffer.seek(0)
-            #yield buffer.read()
-            #buffer.seek(0)
-            #buffer.truncate(0)
-            import torch
-            audio_tensor = result["tts_speech"]  # Shape: [channels, samples]
-            audio_int16 = (audio_tensor.cpu() * 32767).to(torch.int16)
-            yield audio_int16.numpy().tobytes()
+            audio_tensor = result["tts_speech"]
+            wav_tensor = audio_tensor.cpu().detach()
+            buffer = io.BytesIO()
+            torchaudio.save(buffer, wav_tensor, self._cosyvoice_model.sample_rate, format="wav")
+            buffer.seek(0)
+            yield buffer.read()
+            buffer.seek(0)
+            buffer.truncate(0)
+            #import torch
+            #audio_tensor = result["tts_speech"]  # Shape: [channels, samples]
+            #audio_int16 = (audio_tensor.cpu() * 32767).to(torch.int16)
+            #yield audio_int16.numpy().tobytes()
 
     def synthesize_qwen(self, text: str, voice: str = "Chengu") -> bytes:
         from qwen_tts import Qwen3TTSModel

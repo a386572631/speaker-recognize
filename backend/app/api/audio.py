@@ -71,30 +71,30 @@ async def create_speech(request: SpeechRequest, _: None = Depends(verify_api_key
 @router.post("/speechStream")
 async def create_speech_stream(request: SpeechRequest, _: None = Depends(verify_api_key)):
     try:
-        #def generate():
-        #    for chunk in tts_service.synthesize_cosyvoice_stream(request.input, request.voice):
-        #        yield chunk
-
-        #return StreamingResponse(
-        #    generate(),
-        #    media_type="audio/wav",
-        #    headers={"Content-Disposition": "attachment; filename=speech.wav"},
-        #)
         def generate():
-            for pcm_chunk in tts_service.synthesize_cosyvoice_stream(
-                request.input, request.voice
-            ):
-                yield pcm_chunk
+            for chunk in tts_service.synthesize_cosyvoice_stream(request.input, request.voice):
+                yield chunk
 
         return StreamingResponse(
             generate(),
-            media_type="audio/L16",
-            headers={
-                "X-Sample-Rate": str(tts_service._cosyvoice_model.sample_rate),
-                "X-Channels": "1",
-                "X-Bits": "16",
-            }
+            media_type="audio/wav",
+            headers={"Content-Disposition": "attachment; filename=speech.wav"},
         )
+        #def generate():
+        #    for pcm_chunk in tts_service.synthesize_cosyvoice_stream(
+        #        request.input, request.voice
+        #    ):
+        #        yield pcm_chunk
+
+        #return StreamingResponse(
+        #    generate(),
+        #    media_type="audio/L16",
+        #    headers={
+        #        "X-Sample-Rate": str(tts_service._cosyvoice_model.sample_rate),
+        #        "X-Channels": "1",
+        #        "X-Bits": "16",
+        #    }
+        #)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
