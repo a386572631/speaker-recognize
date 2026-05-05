@@ -22,7 +22,7 @@ defineProps({
 const emit = defineEmits(['back'])
 
 const onBack = () => {
-  emit('back')
+  window.history.back()
 }
 </script>
 
