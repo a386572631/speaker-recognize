@@ -129,6 +129,7 @@ class TTSService:
         voice_map = {
             "default": "app/tts_wav/zero_shot_prompt.wav",
             "jjl": "app/tts_wav/jjl.wav",
+            "demo": "app/tts_wav/demo.wav",
         }
         return voice_map.get(voice, "app/tts_wav/zero_shot_prompt.wav")
 
