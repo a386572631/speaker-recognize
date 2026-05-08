@@ -78,8 +78,12 @@ async def create_speech_stream(request: SpeechRequest, _: None = Depends(verify_
 
         return StreamingResponse(
             generate(),
-            media_type="audio/wav",
-            headers={"Content-Disposition": "attachment; filename=speech.wav"},
+            media_type="audio/L16;rate=22050;channels=1",
+            headers={
+                "X-Audio-Sample-Rate": str(tts_service._cosyvoice_model.sample_rate),
+                "X-Audio-Channels": "1", 
+                "X-Audio-Bits": "16"
+            }
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

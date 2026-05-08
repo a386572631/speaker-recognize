@@ -60,21 +60,22 @@ class TTSService:
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
                 yield chunk["data"]
+                await asyncio.sleep(0)
 
-    def synthesize(self, text: str, voice: str = "") -> bytes:
-        text = clean_text(text)
-        if not voice:
-            voice = settings.tts_voice
+    # def synthesize(self, text: str, voice: str = "") -> bytes:
+    #     text = clean_text(text)
+    #     if not voice:
+    #         voice = settings.tts_voice
 
-        tts_model = settings.tts_model.lower()
+    #     tts_model = settings.tts_model.lower()
 
-        if tts_model == "cosyvoice3" or tts_model == "cosyvoice":
-            return self.synthesize_cosyvoice(text, voice)
-        elif tts_model == "qwen-tts" or tts_model == "qwen":
-            return self.synthesize_qwen(text, voice)
-        else:
-            import asyncio
-            return asyncio.run(self.synthesize_edge(text, voice))
+    #     if tts_model == "cosyvoice3" or tts_model == "cosyvoice":
+    #         return self.synthesize_cosyvoice(text, voice)
+    #     elif tts_model == "qwen-tts" or tts_model == "qwen":
+    #         return self.synthesize_qwen(text, voice)
+    #     else:
+    #         import asyncio
+    #         return asyncio.run(self.synthesize_edge(text, voice))
 
     async def synthesize_async(self, text: str, voice: str = "") -> bytes:
         text = clean_text(text)
@@ -90,23 +91,23 @@ class TTSService:
         else:
             return await self.synthesize_edge(text, voice)
 
-    def synthesize_stream(self, text: str, voice: str = ""):
-        text = clean_text(text)
-        if not voice:
-            voice = settings.tts_voice
+    # def synthesize_stream(self, text: str, voice: str = ""):
+    #     text = clean_text(text)
+    #     if not voice:
+    #         voice = settings.tts_voice
 
-        tts_model = settings.tts_model.lower()
+    #     tts_model = settings.tts_model.lower()
 
-        if tts_model == "cosyvoice3" or tts_model == "cosyvoice":
-            return self.synthesize_cosyvoice_stream(text, voice)
-        else:
-            import asyncio
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                return loop.run_until_complete(self.synthesize_stream_async(text, voice))
-            finally:
-                loop.close()
+    #     if tts_model == "cosyvoice3" or tts_model == "cosyvoice":
+    #         return self.synthesize_cosyvoice_stream(text, voice)
+    #     else:
+    #         import asyncio
+    #         loop = asyncio.new_event_loop()
+    #         asyncio.set_event_loop(loop)
+    #         try:
+    #             return loop.run_until_complete(self.synthesize_stream_async(text, voice))
+    #         finally:
+    #             loop.close()
 
     async def synthesize_stream_async(self, text: str, voice: str = ""):
         text = clean_text(text)
@@ -116,7 +117,7 @@ class TTSService:
         tts_model = settings.tts_model.lower()
 
         if tts_model == "cosyvoice3" or tts_model == "cosyvoice":
-            for chunk in self.synthesize_cosyvoice_stream(text, voice):
+            async for chunk in self.synthesize_cosyvoice_stream(text, voice):
                 yield chunk
         else:
             async for chunk in self.synthesize_edge_stream(text, voice):
@@ -164,41 +165,23 @@ class TTSService:
         buffer.seek(0)
         return buffer.read()
 
-    def synthesize_cosyvoice_stream(self, text: str, voice: str = "default", instruction: str = ""):
+    async def synthesize_cosyvoice_stream(self, text: str, voice: str = "default"):
         prompt_wav = self.get_prompt_wav(voice)
-        logger.info(f"复刻音频：{prompt_wav}")
-
-        #stream = self._cosyvoice_model.inference_instruct2(
-        #    tts_text=f"{instruction}<|endofprompt|>{text}",
-        #    instruct_text="",
-        #    prompt_wav=prompt_wav,
-        #    stream=True
-        #)
-        #stream = self._cosyvoice_model.inference_instruct2(
-        #        text, 
-        #        'You are a helpful assistant. 请用尽可能快地语速说一句话。<|endofprompt|>',
-        #        prompt_wav, 
-        #        stream=True
-        #)
-        stream = self._cosyvoice_model.inference_zero_shot(text,
-                            'You are a helpful assistant.<|endofprompt|>希望你以后能够做的比我还好呦。',
-                            prompt_wav,
-                            stream=True)
-
-        buffer = io.BytesIO()
+        stream = self._cosyvoice_model.inference_zero_shot(
+            text,
+            'You are a helpful assistant.<|endofprompt|>希望你以后能够做的比我还好呦。',
+            prompt_wav,
+            stream=True
+        )
+        
         for result in stream:
             audio_tensor = result["tts_speech"]
             wav_tensor = audio_tensor.cpu().detach()
-            buffer = io.BytesIO()
-            torchaudio.save(buffer, wav_tensor, self._cosyvoice_model.sample_rate, format="wav")
-            buffer.seek(0)
-            yield buffer.read()
-            buffer.seek(0)
-            buffer.truncate(0)
-            #import torch
-            #audio_tensor = result["tts_speech"]  # Shape: [channels, samples]
-            #audio_int16 = (audio_tensor.cpu() * 32767).to(torch.int16)
-            #yield audio_int16.numpy().tobytes()
+            
+            # 统一输出 PCM int16，简单直接
+            pcm_data = (wav_tensor.clamp(-1.0, 1.0) * 32767).short().numpy().tobytes()
+            yield pcm_data
+            await asyncio.sleep(0)
 
     def synthesize_qwen(self, text: str, voice: str = "Chengu") -> bytes:
         from qwen_tts import Qwen3TTSModel
