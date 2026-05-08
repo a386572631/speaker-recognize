@@ -78,10 +78,10 @@ async def create_speech_stream(request: SpeechRequest, _: None = Depends(verify_
 
         return StreamingResponse(
             generate(),
-            media_type="audio/L16;rate=22050;channels=1",
+            media_type="audio/L16;rate=44100;channels=1",
             headers={
-                "X-Audio-Sample-Rate": str(tts_service._cosyvoice_model.sample_rate),
-                "X-Audio-Channels": "1", 
+                "X-Audio-Sample-Rate": "44100",
+                "X-Audio-Channels": "1",
                 "X-Audio-Bits": "16"
             }
         )

@@ -173,12 +173,19 @@ class TTSService:
             prompt_wav,
             stream=True
         )
-        
+
+        original_sr = self._cosyvoice_model.sample_rate
+        target_sr = 44100
+        if original_sr != target_sr:
+            resampler = torchaudio.transforms.Resample(orig_freq=original_sr, new_freq=target_sr)
+
         for result in stream:
             audio_tensor = result["tts_speech"]
             wav_tensor = audio_tensor.cpu().detach()
-            
-            # 统一输出 PCM int16，简单直接
+
+            if original_sr != target_sr:
+                wav_tensor = resampler(wav_tensor)
+
             pcm_data = (wav_tensor.clamp(-1.0, 1.0) * 32767).short().numpy().tobytes()
             yield pcm_data
             await asyncio.sleep(0)
